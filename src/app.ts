@@ -49,6 +49,11 @@ app.get("/", (request: Request, response: Response) => {
   response.json({ message: "Welcome to the root URL" });
 });
 
+// app.get("/redirect", (request: Request, response: Response) => {
+//   console.log(request.url);
+//   response.json({ message: "Welcome to the root URL" });
+// });
+
 /** Error handling */
 app.use((req, res, next) => {
   const error = new Error("not found");
