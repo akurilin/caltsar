@@ -4,8 +4,9 @@ import morgan from "morgan";
 import cors from "cors";
 import helmet from "helmet";
 import * as dotenv from "dotenv";
-import { calendar_v3, auth } from "@googleapis/calendar";
+import { calendar_v3, auth, BodyResponseCallback } from "@googleapis/calendar";
 import fs from "fs";
+import events from "./events";
 
 dotenv.config();
 
@@ -32,6 +33,31 @@ fs.readFile(TOKEN_PATH, (err, token) => {
     console.log(`Here's the token read from disk: ${token.toString()}`);
     oauth2Client.setCredentials(JSON.parse(token.toString()));
   }
+});
+
+// The library automatically use the existing refresh token (issued only once
+// at authorization time) to refresh the access token for as long as the refresh
+// token stays valid
+// However once in a blue moon, the refresh token goes stale, and you need to
+// obtain AND STORE a new one wherever you need to
+oauth2Client.on("tokens", (tokens) => {
+  console.log("TOKENS EVENT TRIGGERED!!!!");
+  //
+  // a sample payload looks something like this
+  //
+  // {
+  //   access_token: 'REDACTED_ACCESS_TOKEN_3',
+  //   refresh_token: 'REDACTED_REFRESH_TOKEN_3',
+  //   scope: 'https://www.googleapis.com/auth/calendar.events.readonly',
+  //   token_type: 'Bearer',
+  //   expiry_date: 1633411937822
+  // }
+  if (tokens.refresh_token) {
+    // TODO
+    // store the refresh_token in my persistence storage place
+    console.log(tokens.refresh_token);
+  }
+  console.log(tokens.access_token);
 });
 
 const app: Express = express();
@@ -102,7 +128,6 @@ app.get(
 
     // This will provide an object with the access_token and refresh_token.
     // Save these somewhere safe so they can be used at a later time.
-    // const {tokens} = await oauth2Client.getToken(code)
     const { tokens } = await oauth2Client.getToken(code);
 
     oauth2Client.setCredentials(tokens);
@@ -111,41 +136,19 @@ app.get(
     fs.writeFile(TOKEN_PATH, JSON.stringify(tokens), (err) => {
       if (err) return console.error(err);
       console.log("Token stored to", TOKEN_PATH);
+      next(err);
     });
 
     response.json({ message: "Success: Oauth2 client credentials set!" });
   }
 );
 
-app.get("/events", async (request: Request, response: Response) => {
-  const calendar: calendar_v3.Calendar = new calendar_v3.Calendar({
-    auth: oauth2Client,
-  });
-
-  let googleResponse = await calendar.events
-    .list({
-      calendarId: "primary",
-      timeMin: new Date().toISOString(),
-      maxResults: 10,
-      singleEvents: true,
-      orderBy: "startTime",
-    })
-    .catch((e) => {
-      // TODO: figure out how to identify the issue
-      console.log(e);
-
-      // Works! We can narrow 'err' from 'unknown' to 'Error'.
-      if (e instanceof Error) {
-        throw new Error(e.message);
-      }
-
-      throw new Error("Error: unidentified error");
-    });
-
-  response.json(googleResponse.data);
-});
+app.get("/events", events.getEvents(oauth2Client));
+//app.post("/event-trackings", ...);
+//app.delete("/event-trackings/:eventId", ...);
 
 /** Error handling */
+// Has to be defined last
 app.use((req, res, next) => {
   const error = new Error("not found");
   return res.status(404).json({
