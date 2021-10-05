@@ -4,7 +4,7 @@ import morgan from "morgan";
 import cors from "cors";
 import helmet from "helmet";
 import * as dotenv from "dotenv";
-import { google, Auth, calendar_v3 } from "googleapis";
+import { calendar_v3, auth } from "@googleapis/calendar";
 import fs from "fs";
 
 dotenv.config();
@@ -17,14 +17,22 @@ const PORT: number = parseInt(process.env.PORT as string, 10);
 
 const TOKEN_PATH = "dist/token.json";
 
-const oauth2Client = new google.auth.OAuth2(
+const oauth2Client = new auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
   "http://localhost:3000/oauth2callback"
 );
 
-console.log(`Existing credentials:`);
-console.log(oauth2Client.credentials);
+// console.log(`Existing credentials:`);
+// console.log(oauth2Client.credentials);
+
+fs.readFile(TOKEN_PATH, (err, token) => {
+  if (!err) {
+    console.log("Token found on disk on app startup");
+    console.log(`Here's the token read from disk: ${token.toString()}`);
+    oauth2Client.setCredentials(JSON.parse(token.toString()));
+  }
+});
 
 const app: Express = express();
 
@@ -58,30 +66,24 @@ app.use((req, res, next) => {
 
 /** Routes */
 app.get("/", (request: Request, response: Response) => {
-  // Check if we have previously stored a token.
-  fs.readFile(TOKEN_PATH, (err, token) => {
-    // if (err) return getAccessToken(oAuth2Client, callback);
-    if (err) {
-      const scopes = [
-        "https://www.googleapis.com/auth/calendar.events.readonly",
-      ];
-      const url = oauth2Client.generateAuthUrl({
-        // 'online' (default) or 'offline' (gets refresh_token)
-        access_type: "offline",
+  if (isEmpty(oauth2Client.credentials)) {
+    const scopes = ["https://www.googleapis.com/auth/calendar.events.readonly"];
+    const url = oauth2Client.generateAuthUrl({
+      // 'online' (default) or 'offline' (gets refresh_token)
+      access_type: "offline",
 
-        // If you only need one scope you can pass it as a string
-        scope: scopes,
-      });
-      response.json({
-        message: "Action: Please go to following URL to authorize the app",
-        authUrl: url,
-      });
-    } else {
-      console.log(`Here's the token read from disk: ${token.toString()}`);
-      oauth2Client.setCredentials(JSON.parse(token.toString()));
-      response.json({ message: "Success: You're already authorized." });
-    }
-  });
+      // If you only need one scope you can pass it as a string
+      scope: scopes,
+    });
+    response.json({
+      message: "Action: Please go to following URL to authorize the app",
+      authUrl: url,
+    });
+  } else {
+    // console.log(`Here's the token read from disk: ${token.toString()}`);
+    // oauth2Client.setCredentials(JSON.parse(token.toString()));
+    response.json({ message: "Success: You're already authorized." });
+  }
 });
 
 app.get(
@@ -116,28 +118,11 @@ app.get(
 );
 
 app.get("/events", async (request: Request, response: Response) => {
-  // Note: using explicit types like `Auth.GoogleAuth` are only here for
-  // demonstration purposes.  Generally with TypeScript, these types would
-  // be inferred.
-  // const auth = new google.auth.GoogleAuth();
-  const calendar: calendar_v3.Calendar = google.calendar({
-    version: "v3",
+  const calendar: calendar_v3.Calendar = new calendar_v3.Calendar({
     auth: oauth2Client,
   });
 
-  // // There are generated types for every set of request parameters
-  // const listParams: drive_v3.Params$Resource$Files$List = {};
-  // const res = await drive.files.list(listParams);
-
-  // // There are generated types for the response fields as well
-  // const listResults: drive_v3.Schema$FileList = res.data;
-  // const params: calendar_v3.Paramsj
-  // const auth: OAuth2Client = new google.auth.OAuth2(...);
-  // const calendar: Calendar = google.calendar({ version: 'v3', auth });
-  // const schemaEvent: Schema$Event = (await calendar.events.get({ calendarId, eventId })).data;
-  let events = null;
-
-  events = await calendar.events
+  let googleResponse = await calendar.events
     .list({
       calendarId: "primary",
       timeMin: new Date().toISOString(),
@@ -157,13 +142,8 @@ app.get("/events", async (request: Request, response: Response) => {
       throw new Error("Error: unidentified error");
     });
 
-  response.json(events);
+  response.json(googleResponse.data);
 });
-
-// app.get("/redirect", (request: Request, response: Response) => {
-//   console.log(request.url);
-//   response.json({ message: "Welcome to the root URL" });
-// });
 
 /** Error handling */
 app.use((req, res, next) => {
