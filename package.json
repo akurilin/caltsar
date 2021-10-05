@@ -5,7 +5,7 @@
   "main": "src/app.ts",
   "scripts": {
     "dev": "nodemon src/app.ts",
-    "build": "rm -rf ./dist/ && npx prettier --write . && npx eslint . --ext .js,.jsx,.ts,.tsx && tsc",
+    "build": "rm -rf ./dist/ && npx prettier --check . && npx eslint . --ext .js,.jsx,.ts,.tsx && tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
