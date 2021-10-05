@@ -7,17 +7,18 @@ import * as dotenv from "dotenv";
 import { auth } from "@googleapis/calendar";
 import fs from "fs";
 import events from "./events";
+import { Pool } from "pg";
 
 dotenv.config();
-
 if (!process.env.PORT || !process.env.CLIENT_ID || !process.env.CLIENT_SECRET) {
   process.exit(1);
 }
-
 const PORT: number = parseInt(process.env.PORT as string, 10);
 
+//
+// Configure Google API Oauth client and use credentials from disk for our only test user
+//
 const TOKEN_PATH = "dist/token.json";
-
 const oauth2Client = new auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
@@ -35,6 +36,9 @@ fs.readFile(TOKEN_PATH, (err, token) => {
   }
 });
 
+//
+// Configure the Oauth2 client event handler
+//
 // The library automatically use the existing refresh token (issued only once
 // at authorization time) to refresh the access token for as long as the refresh
 // token stays valid
@@ -60,6 +64,19 @@ oauth2Client.on("tokens", (tokens) => {
   console.log(tokens.access_token);
 });
 
+//
+// Configure Postgres
+//
+
+const pool = new Pool();
+pool.query("SELECT NOW()", (err, res) => {
+  console.log(err, res);
+  pool.end();
+});
+
+//
+// Express starts here
+//
 const app: Express = express();
 
 app.use(helmet());
