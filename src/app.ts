@@ -5,6 +5,7 @@ import cors from "cors";
 import helmet from "helmet";
 import * as dotenv from "dotenv";
 import { google, Auth, calendar_v3 } from "googleapis";
+import fs from "fs";
 
 dotenv.config();
 
@@ -14,11 +15,16 @@ if (!process.env.PORT || !process.env.CLIENT_ID || !process.env.CLIENT_SECRET) {
 
 const PORT: number = parseInt(process.env.PORT as string, 10);
 
+const TOKEN_PATH = "dist/token.json";
+
 const oauth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
   "http://localhost:3000/oauth2callback"
 );
+
+console.log(`Existing credentials:`);
+console.log(oauth2Client.credentials);
 
 const app: Express = express();
 
@@ -52,15 +58,30 @@ app.use((req, res, next) => {
 
 /** Routes */
 app.get("/", (request: Request, response: Response) => {
-  const scopes = ["https://www.googleapis.com/auth/calendar.events.readonly"];
-  const url = oauth2Client.generateAuthUrl({
-    // 'online' (default) or 'offline' (gets refresh_token)
-    access_type: "offline",
+  // Check if we have previously stored a token.
+  fs.readFile(TOKEN_PATH, (err, token) => {
+    // if (err) return getAccessToken(oAuth2Client, callback);
+    if (err) {
+      const scopes = [
+        "https://www.googleapis.com/auth/calendar.events.readonly",
+      ];
+      const url = oauth2Client.generateAuthUrl({
+        // 'online' (default) or 'offline' (gets refresh_token)
+        access_type: "offline",
 
-    // If you only need one scope you can pass it as a string
-    scope: scopes,
+        // If you only need one scope you can pass it as a string
+        scope: scopes,
+      });
+      response.json({
+        message: "Action: Please go to following URL to authorize the app",
+        authUrl: url,
+      });
+    } else {
+      console.log(`Here's the token read from disk: ${token.toString()}`);
+      oauth2Client.setCredentials(JSON.parse(token.toString()));
+      response.json({ message: "Success: You're already authorized." });
+    }
   });
-  response.json({ authUrl: url });
 });
 
 app.get(
@@ -81,7 +102,14 @@ app.get(
     // Save these somewhere safe so they can be used at a later time.
     // const {tokens} = await oauth2Client.getToken(code)
     const { tokens } = await oauth2Client.getToken(code);
+
     oauth2Client.setCredentials(tokens);
+
+    // this would eventually go in a database associated with the specific user
+    fs.writeFile(TOKEN_PATH, JSON.stringify(tokens), (err) => {
+      if (err) return console.error(err);
+      console.log("Token stored to", TOKEN_PATH);
+    });
 
     response.json({ message: "Success: Oauth2 client credentials set!" });
   }
@@ -107,13 +135,27 @@ app.get("/events", async (request: Request, response: Response) => {
   // const auth: OAuth2Client = new google.auth.OAuth2(...);
   // const calendar: Calendar = google.calendar({ version: 'v3', auth });
   // const schemaEvent: Schema$Event = (await calendar.events.get({ calendarId, eventId })).data;
-  const events = await calendar.events.list({
-    calendarId: "primary",
-    timeMin: new Date().toISOString(),
-    maxResults: 10,
-    singleEvents: true,
-    orderBy: "startTime",
-  });
+  let events = null;
+
+  events = await calendar.events
+    .list({
+      calendarId: "primary",
+      timeMin: new Date().toISOString(),
+      maxResults: 10,
+      singleEvents: true,
+      orderBy: "startTime",
+    })
+    .catch((e) => {
+      // TODO: figure out how to identify the issue
+      console.log(e);
+
+      // Works! We can narrow 'err' from 'unknown' to 'Error'.
+      if (e instanceof Error) {
+        throw new Error(e.message);
+      }
+
+      throw new Error("Error: unidentified error");
+    });
 
   response.json(events);
 });
@@ -137,3 +179,7 @@ const httpServer = http.createServer(app);
 httpServer.listen(PORT, () =>
   console.log(`The server is running on port ${PORT}`)
 );
+
+function isEmpty(o: Object): boolean {
+  return Object.keys(o).length === 0;
+}
