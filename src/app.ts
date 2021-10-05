@@ -4,7 +4,7 @@ import morgan from "morgan";
 import cors from "cors";
 import helmet from "helmet";
 import * as dotenv from "dotenv";
-import { calendar_v3, auth, BodyResponseCallback } from "@googleapis/calendar";
+import { auth } from "@googleapis/calendar";
 import fs from "fs";
 import events from "./events";
 
@@ -92,8 +92,12 @@ app.use((req, res, next) => {
 
 /** Routes */
 app.get("/", (request: Request, response: Response) => {
-  if (isEmpty(oauth2Client.credentials)) {
+  if (Object.keys(oauth2Client.credentials).length === 0) {
     const scopes = ["https://www.googleapis.com/auth/calendar.events.readonly"];
+
+    // you can force the consent screen here if you really want to for some
+    // reason, such as getting a refresh_token, by passing prompt: 'consent'
+    // into the options below
     const url = oauth2Client.generateAuthUrl({
       // 'online' (default) or 'offline' (gets refresh_token)
       access_type: "offline",
@@ -149,7 +153,7 @@ app.get("/events", events.getEvents(oauth2Client));
 
 /** Error handling */
 // Has to be defined last
-app.use((req, res, next) => {
+app.use((req, res) => {
   const error = new Error("not found");
   return res.status(404).json({
     message: error.message,
@@ -162,7 +166,3 @@ const httpServer = http.createServer(app);
 httpServer.listen(PORT, () =>
   console.log(`The server is running on port ${PORT}`)
 );
-
-function isEmpty(o: Object): boolean {
-  return Object.keys(o).length === 0;
-}

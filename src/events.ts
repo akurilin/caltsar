@@ -1,4 +1,4 @@
-import { calendar_v3, BodyResponseCallback } from "@googleapis/calendar";
+import { calendar_v3 } from "@googleapis/calendar";
 import { Request, Response, NextFunction } from "express";
 import { GaxiosError } from "gaxios";
 import { OAuth2Client } from "googleapis-common";
@@ -11,7 +11,11 @@ import { OAuth2Client } from "googleapis-common";
 // }
 
 const getEvents = (oauth2Client: OAuth2Client) => {
-  return async (request: Request, response: Response, next: NextFunction) => {
+  return async (
+    request: Request,
+    response: Response,
+    next: NextFunction
+  ): Promise<void> => {
     const calendar: calendar_v3.Calendar = new calendar_v3.Calendar({
       auth: oauth2Client,
     });
