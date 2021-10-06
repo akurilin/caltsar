@@ -303,8 +303,22 @@ app.get(
 );
 
 // test
-app.get("/auth/google/callback", () => {
-  console.log("foo");
+app.get("/authenticated", (req) => {
+  console.log("hitting an authenticated route");
+  console.log(req.session);
+});
+app.get("/unauthenticated", () => {
+  console.log("hitting an unauthenticated route");
+});
+
+app.get("/logout", (req, res) => {
+  // console.log(req.session);
+  req.session.destroy((err) => {
+    // console.error("ERROR: Could not destroy session");
+    // console.error(err);
+    // console.log(req.session);
+    return res.status(200).json({});
+  });
 });
 
 app.get(
