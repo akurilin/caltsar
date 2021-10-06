@@ -303,20 +303,22 @@ app.get(
 );
 
 // test
-app.get("/authenticated", (req) => {
+app.get("/authenticated", (req, res) => {
   console.log("hitting an authenticated route");
   console.log(req.session);
+  return res.status(200).json({});
 });
-app.get("/unauthenticated", () => {
+app.get("/unauthenticated", (req, res) => {
   console.log("hitting an unauthenticated route");
+  return res.status(200).json({});
 });
 
 app.get("/logout", (req, res) => {
-  // console.log(req.session);
-  req.session.destroy((err) => {
-    // console.error("ERROR: Could not destroy session");
-    // console.error(err);
-    // console.log(req.session);
+  req.session.destroy(() => {
+    // this is the default library name for the session cookie associated with
+    // the user session in whatever store of your choosing
+    // clear the cookie if the session was successfully destroyed in the store
+    res.clearCookie("connect.sid");
     return res.status(200).json({});
   });
 });
