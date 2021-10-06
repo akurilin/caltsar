@@ -1,19 +1,116 @@
 import http from "http";
 import express, { Express, Request, Response, NextFunction } from "express";
+import expressSession from "express-session";
+// import pgSession from "connect-pg-simple";
 import morgan from "morgan";
 import cors from "cors";
 import helmet from "helmet";
 import * as dotenv from "dotenv";
 import { auth } from "@googleapis/calendar";
 import fs from "fs";
-import events from "./events";
-import { Pool } from "pg";
+import Event from "./event";
+import user, { User } from "./user";
+// import { Pool } from "pg";
+import passport from "passport";
+import {
+  Strategy as GoogleStrategy,
+  VerifyCallback,
+} from "passport-google-oauth2";
 
 dotenv.config();
-if (!process.env.PORT || !process.env.CLIENT_ID || !process.env.CLIENT_SECRET) {
+if (
+  !process.env.PORT ||
+  !process.env.CLIENT_ID ||
+  !process.env.CLIENT_SECRET ||
+  !process.env.COOKIE_SECRET
+) {
   process.exit(1);
 }
 const PORT: number = parseInt(process.env.PORT as string, 10);
+
+//
+// Configure Passport
+//
+// Sample Google Profile:
+//
+// {
+//   provider: 'google',
+//   sub: '113738270040001178733',
+//   id: '113738270040001178733',
+//   displayName: 'Alexandr Kurilin',
+//   name: { givenName: 'Alexandr', familyName: 'Kurilin' },
+//   given_name: 'Alexandr',
+//   family_name: 'Kurilin',
+//   email_verified: true,
+//   verified: true,
+//   language: 'en',
+//   locale: undefined,
+//   email: 'alexandr.kurilin@gmail.com',
+//   emails: [ { value: 'alexandr.kurilin@gmail.com', type: 'account' } ],
+//   photos: [
+//     {
+//       value: 'https://lh3.googleusercontent.com/a/AATXAJwlhjEuJh-E-Ey7I27qxLRk_J_CBYkQQYxFzDXC=s96-c',
+//       type: 'default'
+//     }
+//   ],
+//   picture: 'https://lh3.googleusercontent.com/a/AATXAJwlhjEuJh-E-Ey7I27qxLRk_J_CBYkQQYxFzDXC=s96-c',
+//   _raw: '{\n' +
+//     '  "sub": "113738270040001178733",\n' +
+//     '  "name": "Alexandr Kurilin",\n' +
+//     '  "given_name": "Alexandr",\n' +
+//     '  "family_name": "Kurilin",\n' +
+//     '  "picture": "https://lh3.googleusercontent.com/a/AATXAJwlhjEuJh-E-Ey7I27qxLRk_J_CBYkQQYxFzDXC\\u003ds96-c",\n' +
+//     '  "email": "alexandr.kurilin@gmail.com",\n' +
+//     '  "email_verified": true,\n' +
+//     '  "locale": "en"\n' +
+//     '}',
+//   _json: {
+//     sub: '113738270040001178733',
+//     name: 'Alexandr Kurilin',
+//     given_name: 'Alexandr',
+//     family_name: 'Kurilin',
+//     picture: 'https://lh3.googleusercontent.com/a/AATXAJwlhjEuJh-E-Ey7I27qxLRk_J_CBYkQQYxFzDXC=s96-c',
+//     email: 'alexandr.kurilin@gmail.com',
+//     email_verified: true,
+//     locale: 'en'
+//   }
+// }
+// { googleId: '113738270040001178733' }
+//
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.CLIENT_ID,
+      clientSecret: process.env.CLIENT_SECRET,
+      callbackURL: "http://localhost:3000/auth/google/callback",
+      passReqToCallback: true,
+    },
+    (
+      request: Request,
+      accessToken: string,
+      refreshToken: string,
+      profile: passport.Profile,
+      done: VerifyCallback
+    ): void => {
+      // console.log("LOG: retrieving user with Google profile");
+      // console.log(profile);
+      // console.log("LOG: retrieving user with this request");
+      // console.log(request);
+
+      // find the user, create it if necessary
+      user.findOrCreate(
+        { googleId: profile.id },
+        (err: Error | null, userItem: User) => {
+          return done(err, userItem);
+        }
+      );
+
+      // TODO: update the google oauth client to have the access token and the
+      // refresh tokens here
+      //
+    }
+  )
+);
 
 //
 // Configure Google API Oauth client and use credentials from disk for our only test user
@@ -68,11 +165,11 @@ oauth2Client.on("tokens", (tokens) => {
 // Configure Postgres
 //
 
-const pool = new Pool();
-pool.query("SELECT NOW()", (err, res) => {
-  console.log(err, res);
-  pool.end();
-});
+// const pgPool = new Pool();
+// pool.query("SELECT NOW()", (err, res) => {
+//   console.log(err, res);
+//   pool.end();
+// });
 
 //
 // Express starts here
@@ -85,8 +182,56 @@ app.use(express.json());
 
 /** Logging */
 app.use(morgan("dev"));
+
+//
+// express-session + postgres session store
+//
+
+// const specializedSession = pgSession(expressSession);
+// const sess = {
+//   secret: process.env.COOKIE_SECRET,
+//   cookie: { secure: false, maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30 days
+
+//   // TODO: do we want to store these sessions in the DB? Probably yes otherwise
+//   // people get logged out on ever app reboot?
+//   store: new specializedSession({ pool: pgPool, tableName: "sessions" }),
+
+//   resave: false,
+//   saveUninitialized: false,
+// };
+
+passport.serializeUser(function (user: any, done) {
+  done(null, user.id);
+});
+
+passport.deserializeUser(function (id: number, done) {
+  user.findById(id, function (err: Error | null, user: User) {
+    done(err, user);
+  });
+});
+
+const sess = {
+  secret: process.env.COOKIE_SECRET,
+  cookie: { secure: false }, // 30 days
+
+  // TODO: do we want to store these sessions in the DB? Probably yes otherwise
+  // people get logged out on ever app reboot?
+  // store:
+
+  resave: true,
+  saveUninitialized: false,
+};
+
+if (app.get("env") === "production") {
+  app.set("trust proxy", 1); // trust first proxy
+  sess.cookie.secure = true; // serve secure cookies
+}
+
+app.use(expressSession(sess));
+
 /** Parse the request */
 app.use(express.urlencoded({ extended: false }));
+
 /** Takes care of JSON data */
 app.use(express.json());
 
@@ -106,6 +251,9 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 /** Routes */
 app.get("/", (request: Request, response: Response) => {
@@ -131,6 +279,32 @@ app.get("/", (request: Request, response: Response) => {
     // oauth2Client.setCredentials(JSON.parse(token.toString()));
     response.json({ message: "Success: You're already authorized." });
   }
+});
+
+//
+// Browser is directed to this route from the login page
+//
+// TODO: ask for the calendar scopes too?
+app.get(
+  "/auth/google",
+  passport.authenticate("google", { scope: ["email", "profile"] })
+);
+
+//
+// Google redirects the browser here after consent is given
+//
+app.get(
+  "/auth/google/callback",
+  passport.authenticate("google", {
+    // TODO: figure out where you want to redirect people here
+    successRedirect: "/auth/google/success",
+    failureRedirect: "/auth/google/failure",
+  })
+);
+
+// test
+app.get("/auth/google/callback", () => {
+  console.log("foo");
 });
 
 app.get(
@@ -164,7 +338,7 @@ app.get(
   }
 );
 
-app.get("/events", events.getEvents(oauth2Client));
+app.get("/events", Event.getEvents(oauth2Client));
 //app.post("/event-trackings", ...);
 //app.delete("/event-trackings/:eventId", ...);
 
