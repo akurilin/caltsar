@@ -1,7 +1,7 @@
 import http from "http";
 import express, { Express, Request, Response, NextFunction } from "express";
 import expressSession from "express-session";
-// import pgSession from "connect-pg-simple";
+import pgSession from "connect-pg-simple";
 import morgan from "morgan";
 import cors from "cors";
 import helmet from "helmet";
@@ -208,42 +208,44 @@ app.use(morgan("dev"));
 // express-session + postgres session store
 //
 
-// const specializedSession = pgSession(expressSession);
-// const sess = {
-//   secret: process.env.COOKIE_SECRET,
-//   cookie: { secure: false, maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30 days
+const specializedSession = pgSession(expressSession);
+const sess = {
+  secret: process.env.COOKIE_SECRET,
+  cookie: { secure: false, maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30 days
 
-//   // TODO: do we want to store these sessions in the DB? Probably yes otherwise
-//   // people get logged out on ever app reboot?
-//   store: new specializedSession({ pool: pgPool, tableName: "sessions" }),
+  // TODO: do we want to store these sessions in the DB? Probably yes otherwise
+  // people get logged out on ever app reboot?
+  store: new specializedSession({ pool: pool, tableName: "sessions" }),
 
-//   resave: false,
-//   saveUninitialized: false,
-// };
+  resave: false,
+  saveUninitialized: false,
+};
 
 // Passport defines User as {} anyway
 /* eslint-disable @typescript-eslint/no-explicit-any */
 passport.serializeUser(function (user: any, done) {
+  console.log("passport.serializeUser");
   done(null, user.id);
 });
 
 passport.deserializeUser(function (id: number, done) {
+  console.log("passport.deserializeUser");
   user.findById(pool, id, (err: Error | null, user: UserEntity | null) => {
     done(err, user);
   });
 });
 
-const sess = {
-  secret: process.env.COOKIE_SECRET,
-  cookie: { secure: false }, // 30 days
+// const sess = {
+//   secret: process.env.COOKIE_SECRET,
+//   cookie: { secure: false }, // 30 days
 
-  // TODO: do we want to store these sessions in the DB? Probably yes otherwise
-  // people get logged out on ever app reboot?
-  // store:
+//   // TODO: do we want to store these sessions in the DB? Probably yes otherwise
+//   // people get logged out on ever app reboot?
+//   // store:
 
-  resave: true,
-  saveUninitialized: false,
-};
+//   resave: true,
+//   saveUninitialized: false,
+// };
 
 if (app.get("env") === "production") {
   app.set("trust proxy", 1); // trust first proxy
@@ -251,6 +253,7 @@ if (app.get("env") === "production") {
 }
 
 app.use(expressSession(sess));
+// app.use(specializedSession(sess));
 
 /** Parse the request */
 app.use(express.urlencoded({ extended: false }));
@@ -330,15 +333,28 @@ app.get(
   })
 );
 
-// test
-app.get("/authenticated", (req, res) => {
-  console.log("hitting an authenticated route");
-  console.log(req.session);
-  return res.status(200).json({});
+//
+// Make used to protect authenticated route from unauthed access
+//
+function ensureUserIsLoggedIn(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ message: "Not authenticated" });
+  } else {
+    next();
+  }
+}
+
+// 2x test routes to test authentication
+app.get("/authenticated", ensureUserIsLoggedIn, (req, res) => {
+  return res.status(200).json({ message: "YES, you are authenticated" });
 });
+
 app.get("/unauthenticated", (req, res) => {
-  console.log("hitting an unauthenticated route");
-  return res.status(200).json({});
+  if (!req.user) {
+    return res.status(200).json({ message: "YES, you are unauthenticated" });
+  } else {
+    return res.status(200).json({ message: "NO, you are not unauthenticated" });
+  }
 });
 
 app.get("/auth/logout", (req, res) => {
