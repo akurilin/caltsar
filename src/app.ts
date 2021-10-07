@@ -9,8 +9,8 @@ import * as dotenv from "dotenv";
 import { auth } from "@googleapis/calendar";
 import fs from "fs";
 import Event from "./event";
-import user, { User } from "./user";
-// import { Pool } from "pg";
+import user, { UserEntity } from "./user";
+import { Pool } from "pg";
 import passport from "passport";
 import {
   Strategy as GoogleStrategy,
@@ -27,6 +27,21 @@ if (
   process.exit(1);
 }
 const PORT: number = parseInt(process.env.PORT as string, 10);
+
+//
+// Configure Postgres
+//
+
+const pool = new Pool();
+
+//
+// uncomment the below just to sanity check the PG connection settings
+// string
+//
+// pool.query("SELECT NOW()", (err, res) => {
+//   console.log(err, res);
+//   pool.end();
+// });
 
 //
 // Configure Passport
@@ -97,10 +112,26 @@ passport.use(
       // console.log("LOG: retrieving user with this request");
       // console.log(request);
 
+      if (!profile.name || !profile.emails) {
+        done(
+          new Error("Cannot create account without a full name or email"),
+          null
+        );
+      }
+
       // find the user, create it if necessary
       user.findOrCreate(
-        { googleId: profile.id },
-        (err: Error | null, userItem: User) => {
+        pool,
+        {
+          googleId: profile.id,
+          firstName: profile.name ? profile.name.givenName : "NOFIRST",
+          lastName: profile.name ? profile.name.familyName : "NOLAST",
+          email:
+            profile.emails && profile.emails[0]
+              ? profile.emails[0].value
+              : "NOEMAIL",
+        },
+        (err: Error | null, userItem: UserEntity | null) => {
           return done(err, userItem);
         }
       );
@@ -162,16 +193,6 @@ oauth2Client.on("tokens", (tokens) => {
 });
 
 //
-// Configure Postgres
-//
-
-// const pgPool = new Pool();
-// pool.query("SELECT NOW()", (err, res) => {
-//   console.log(err, res);
-//   pool.end();
-// });
-
-//
 // Express starts here
 //
 const app: Express = express();
@@ -200,12 +221,14 @@ app.use(morgan("dev"));
 //   saveUninitialized: false,
 // };
 
+// Passport defines User as {} anyway
+/* eslint-disable @typescript-eslint/no-explicit-any */
 passport.serializeUser(function (user: any, done) {
   done(null, user.id);
 });
 
 passport.deserializeUser(function (id: number, done) {
-  user.findById(id, function (err: Error | null, user: User) {
+  user.findById(pool, id, (err: Error | null, user: UserEntity | null) => {
     done(err, user);
   });
 });
@@ -284,10 +307,15 @@ app.get("/", (request: Request, response: Response) => {
 //
 // Browser is directed to this route from the login page
 //
-// TODO: ask for the calendar scopes too?
 app.get(
   "/auth/google",
-  passport.authenticate("google", { scope: ["email", "profile"] })
+  passport.authenticate("google", {
+    scope: [
+      "email",
+      "profile",
+      "https://www.googleapis.com/auth/calendar.events.readonly",
+    ],
+  })
 );
 
 //
@@ -313,7 +341,7 @@ app.get("/unauthenticated", (req, res) => {
   return res.status(200).json({});
 });
 
-app.get("/logout", (req, res) => {
+app.get("/auth/logout", (req, res) => {
   req.session.destroy(() => {
     // this is the default library name for the session cookie associated with
     // the user session in whatever store of your choosing
