@@ -22,7 +22,14 @@ if (
   !process.env.PORT ||
   !process.env.CLIENT_ID ||
   !process.env.CLIENT_SECRET ||
-  !process.env.COOKIE_SECRET
+  !process.env.NODE_ENV ||
+  !process.env.PGUSER ||
+  !process.env.PGHOST ||
+  !process.env.PGPASSWORD ||
+  !process.env.PGDATABASE ||
+  !process.env.PGPORT ||
+  !process.env.COOKIE_SECRET ||
+  !process.env.FRONTEND_URI
 ) {
   console.error("The app is missing a mandatory environment variable");
   process.exit(1);
@@ -340,8 +347,8 @@ app.get(
   "/auth/google/callback",
   passport.authenticate("google", {
     // TODO: figure out where you want to redirect people here
-    successRedirect: "/auth/google/success",
-    failureRedirect: "/auth/google/failure",
+    successRedirect: `${process.env.FRONTEND_URI}/dashboard`,
+    failureRedirect: `${process.env.FRONTEND_URI}#failed-login`,
   })
 );
 
