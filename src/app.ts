@@ -24,6 +24,7 @@ if (
   !process.env.CLIENT_SECRET ||
   !process.env.COOKIE_SECRET
 ) {
+  console.error("The app is missing a mandatory environment variable");
   process.exit(1);
 }
 const PORT: number = parseInt(process.env.PORT as string, 10);
@@ -42,6 +43,17 @@ const pool = new Pool();
 //   console.log(err, res);
 //   pool.end();
 // });
+
+// the pool will emit an error on behalf of any idle clients
+// it contains if a backend error or network partition happens
+pool.on("error", (err) => {
+  console.error("Postgres Pool Error: Unexpected error on idle client", err);
+
+  // It's not clear if crashing the server is a great idea once it's up and
+  // running, but it seems like a really good idea at boot time so that we know
+  // right away that something is off
+  process.exit(-1);
+});
 
 //
 // Configure Passport
