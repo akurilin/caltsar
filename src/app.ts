@@ -230,7 +230,10 @@ app.use(morgan("dev"));
 const specializedSession = pgSession(expressSession);
 const sess = {
   secret: process.env.COOKIE_SECRET,
-  cookie: { secure: false, maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30 days
+
+  // sameSite: true might bite us later in production if we have
+  // two different subdomains, be aware of this
+  cookie: { secure: false, maxAge: 30 * 24 * 60 * 60 * 1000, sameSite: true }, // 30 days
 
   // TODO: do we want to store these sessions in the DB? Probably yes otherwise
   // people get logged out on ever app reboot?
@@ -280,14 +283,18 @@ app.use(express.urlencoded({ extended: false }));
 /** Takes care of JSON data */
 app.use(express.json());
 
-/** RULES OF OUR API */
+// /** RULES OF OUR API */
 app.use((req, res, next) => {
   // set the CORS policy
-  res.header("Access-Control-Allow-Origin", "*");
+  // res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Origin", process.env.FRONTEND_URI);
+  res.header("Access-Control-Allow-Credentials", "true");
+  // doesn't seem necessary
+  // res.header("Vary", "Origin");
   // set the CORS headers
   res.header(
     "Access-Control-Allow-Headers",
-    "origin, X-Requested-With,Content-Type,Accept, Authorization"
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
   );
   // set the CORS method headers
   if (req.method === "OPTIONS") {
@@ -356,9 +363,13 @@ app.get(
 // Make used to protect authenticated route from unauthed access
 //
 function ensureUserIsLoggedIn(req: Request, res: Response, next: NextFunction) {
+  // console.log("ENSURING!!!");
+  // console.log(req);
   if (!req.user) {
+    console.log("NO REQ USER");
     return res.status(401).json({ message: "Not authenticated" });
   } else {
+    console.log("REQ USER FOUND");
     next();
   }
 }
@@ -374,6 +385,11 @@ app.get("/unauthenticated", (req, res) => {
   } else {
     return res.status(200).json({ message: "NO, you are not unauthenticated" });
   }
+});
+
+app.get("/meetings", ensureUserIsLoggedIn, (req, res) => {
+  // app.get("/meetings", (req, res) => {
+  return res.status(200).json([{ id: 1 }, { id: 2 }]);
 });
 
 app.get("/auth/logout", (req, res) => {
