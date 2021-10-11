@@ -94,4 +94,17 @@ export function findById(
   });
 }
 
+// export async function findByIdPromise(
+//   pool: Pool,
+//   id: number
+// ): Promise<User | null> {
+//   let res = null;
+//   try {
+//     res = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
+//   } catch (err) {
+//     console.log("User.findById - error");
+//   }
+//   return res?.rows.length === 1 ? convertDBRowToEntity(res.rows[0]) : null;
+// }
+
 export default { findOrCreate, findById };

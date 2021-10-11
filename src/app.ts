@@ -376,6 +376,7 @@ function ensureUserIsLoggedIn(req: Request, res: Response, next: NextFunction) {
 
 // 2x test routes to test authentication
 app.get("/authenticated", ensureUserIsLoggedIn, (req, res) => {
+  console.log(req.user);
   return res.status(200).json({ message: "YES, you are authenticated" });
 });
 
@@ -385,6 +386,11 @@ app.get("/unauthenticated", (req, res) => {
   } else {
     return res.status(200).json({ message: "NO, you are not unauthenticated" });
   }
+});
+
+app.get("/users/me", ensureUserIsLoggedIn, async (req, res) => {
+  // the user is guaranteed to be in the request thanks to the auth check
+  res.status(200).json(req.user);
 });
 
 app.get("/meetings", ensureUserIsLoggedIn, (req, res) => {
