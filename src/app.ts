@@ -332,6 +332,7 @@ app.get("/meetings", ensureUserIsLoggedIn, (req, res) => {
   return res.status(200).json([{ id: 1 }, { id: 2 }]);
 });
 
+// TODO: consider turning this into a DELETE /sessions
 app.get("/auth/logout", ensureUserIsLoggedIn, (req, res) => {
   req.session.destroy(() => {
     // this is the default library name for the session cookie associated with
