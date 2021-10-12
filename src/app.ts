@@ -8,14 +8,16 @@ import helmet from "helmet";
 import * as dotenv from "dotenv";
 import { auth } from "@googleapis/calendar";
 import fs from "fs";
-import Event from "./event";
-import user, { UserEntity } from "./user";
+import Event from "./models/event";
+import user, { UserEntity } from "./models/user";
 import { Pool } from "pg";
 import passport from "passport";
 import {
   Strategy as GoogleStrategy,
   VerifyCallback,
 } from "passport-google-oauth2";
+import { getCurrentUser } from "./handlers/userhandler";
+import { ensureUserIsLoggedIn } from "./handlers/auth";
 
 dotenv.config();
 if (
@@ -65,52 +67,7 @@ pool.on("error", (err) => {
 //
 // Configure Passport
 //
-// Sample Google Profile:
-//
-// {
-//   provider: 'google',
-//   sub: '113738270040001178733',
-//   id: '113738270040001178733',
-//   displayName: 'Alexandr Kurilin',
-//   name: { givenName: 'Alexandr', familyName: 'Kurilin' },
-//   given_name: 'Alexandr',
-//   family_name: 'Kurilin',
-//   email_verified: true,
-//   verified: true,
-//   language: 'en',
-//   locale: undefined,
-//   email: 'alexandr.kurilin@gmail.com',
-//   emails: [ { value: 'alexandr.kurilin@gmail.com', type: 'account' } ],
-//   photos: [
-//     {
-//       value: 'https://lh3.googleusercontent.com/a/AATXAJwlhjEuJh-E-Ey7I27qxLRk_J_CBYkQQYxFzDXC=s96-c',
-//       type: 'default'
-//     }
-//   ],
-//   picture: 'https://lh3.googleusercontent.com/a/AATXAJwlhjEuJh-E-Ey7I27qxLRk_J_CBYkQQYxFzDXC=s96-c',
-//   _raw: '{\n' +
-//     '  "sub": "113738270040001178733",\n' +
-//     '  "name": "Alexandr Kurilin",\n' +
-//     '  "given_name": "Alexandr",\n' +
-//     '  "family_name": "Kurilin",\n' +
-//     '  "picture": "https://lh3.googleusercontent.com/a/AATXAJwlhjEuJh-E-Ey7I27qxLRk_J_CBYkQQYxFzDXC\\u003ds96-c",\n' +
-//     '  "email": "alexandr.kurilin@gmail.com",\n' +
-//     '  "email_verified": true,\n' +
-//     '  "locale": "en"\n' +
-//     '}',
-//   _json: {
-//     sub: '113738270040001178733',
-//     name: 'Alexandr Kurilin',
-//     given_name: 'Alexandr',
-//     family_name: 'Kurilin',
-//     picture: 'https://lh3.googleusercontent.com/a/AATXAJwlhjEuJh-E-Ey7I27qxLRk_J_CBYkQQYxFzDXC=s96-c',
-//     email: 'alexandr.kurilin@gmail.com',
-//     email_verified: true,
-//     locale: 'en'
-//   }
-// }
-// { googleId: '113738270040001178733' }
-//
+
 passport.use(
   new GoogleStrategy(
     {
@@ -126,11 +83,6 @@ passport.use(
       profile: passport.Profile,
       done: VerifyCallback
     ): void => {
-      // console.log("LOG: retrieving user with Google profile");
-      // console.log(profile);
-      // console.log("LOG: retrieving user with this request");
-      // console.log(request);
-
       if (!profile.name || !profile.emails) {
         done(
           new Error("Cannot create account without a full name or email"),
@@ -359,21 +311,6 @@ app.get(
   })
 );
 
-//
-// Make used to protect authenticated route from unauthed access
-//
-function ensureUserIsLoggedIn(req: Request, res: Response, next: NextFunction) {
-  // console.log("ENSURING!!!");
-  // console.log(req);
-  if (!req.user) {
-    console.log("NO REQ USER");
-    return res.status(401).json({ message: "Not authenticated" });
-  } else {
-    console.log("REQ USER FOUND");
-    next();
-  }
-}
-
 // 2x test routes to test authentication
 app.get("/authenticated", ensureUserIsLoggedIn, (req, res) => {
   console.log(req.user);
@@ -388,17 +325,14 @@ app.get("/unauthenticated", (req, res) => {
   }
 });
 
-app.get("/users/me", ensureUserIsLoggedIn, async (req, res) => {
-  // the user is guaranteed to be in the request thanks to the auth check
-  res.status(200).json(req.user);
-});
+app.get("/users/me", ensureUserIsLoggedIn, getCurrentUser);
 
 app.get("/meetings", ensureUserIsLoggedIn, (req, res) => {
   // app.get("/meetings", (req, res) => {
   return res.status(200).json([{ id: 1 }, { id: 2 }]);
 });
 
-app.get("/auth/logout", (req, res) => {
+app.get("/auth/logout", ensureUserIsLoggedIn, (req, res) => {
   req.session.destroy(() => {
     // this is the default library name for the session cookie associated with
     // the user session in whatever store of your choosing
