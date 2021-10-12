@@ -3,14 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import { GaxiosError } from "gaxios";
 import { OAuth2Client } from "googleapis-common";
 
-// interface Post {
-//     userId: Number;
-//     id: Number;
-//     title: String;
-//     body: String;
-// }
-
-const getEvents = (oauth2Client: OAuth2Client) => {
+export function getEvents(oauth2Client: OAuth2Client) {
   return async (
     request: Request,
     response: Response,
@@ -54,10 +47,10 @@ const getEvents = (oauth2Client: OAuth2Client) => {
             next(err);
           }
         } else {
-          // console.log(res);
-
           if (res) {
-            response.json(res.data.items);
+            // more of a memento for myself to remember what type this is
+            const events: calendar_v3.Schema$Events = res.data;
+            response.json(events.items);
           } else {
             response.json([]);
           }
@@ -65,6 +58,4 @@ const getEvents = (oauth2Client: OAuth2Client) => {
       }
     );
   };
-};
-
-export default { getEvents };
+}

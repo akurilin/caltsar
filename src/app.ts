@@ -7,8 +7,6 @@ import cors from "cors";
 import helmet from "helmet";
 import * as dotenv from "dotenv";
 import { auth } from "@googleapis/calendar";
-import fs from "fs";
-import Event from "./models/event";
 import user, { UserEntity } from "./models/user";
 import { Pool } from "pg";
 import passport from "passport";
@@ -18,6 +16,7 @@ import {
 } from "passport-google-oauth2";
 import { getCurrentUser } from "./handlers/userhandler";
 import { ensureUserIsLoggedIn } from "./handlers/auth";
+import { getEvents } from "./handlers/events";
 
 dotenv.config();
 if (
@@ -65,6 +64,16 @@ pool.on("error", (err) => {
 });
 
 //
+// Configure Google API Oauth client and use credentials from disk for our only test user
+//
+// const TOKEN_PATH = "dist/token.json";
+const oauth2Client = new auth.OAuth2(
+  process.env.CLIENT_ID,
+  process.env.CLIENT_SECRET,
+  "http://localhost:3000/oauth2callback"
+);
+
+//
 // Configure Passport
 //
 
@@ -107,33 +116,19 @@ passport.use(
         }
       );
 
-      // TODO: update the google oauth client to have the access token and the
-      // refresh tokens here
-      //
+      // Reuse our Passport login credentials inside of the Google API Node
+      // Client
+      // {
+      //   access_token: 'REDACTED_ACCESS_TOKEN_3',
+      //   refresh_token: 'REDACTED_REFRESH_TOKEN_3',
+      // oauth2Client.setCredentials(JSON.parse(token.toString()));
+      oauth2Client.setCredentials({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
     }
   )
 );
-
-//
-// Configure Google API Oauth client and use credentials from disk for our only test user
-//
-const TOKEN_PATH = "dist/token.json";
-const oauth2Client = new auth.OAuth2(
-  process.env.CLIENT_ID,
-  process.env.CLIENT_SECRET,
-  "http://localhost:3000/oauth2callback"
-);
-
-// console.log(`Existing credentials:`);
-// console.log(oauth2Client.credentials);
-
-fs.readFile(TOKEN_PATH, (err, token) => {
-  if (!err) {
-    console.log("Token found on disk on app startup");
-    console.log(`Here's the token read from disk: ${token.toString()}`);
-    oauth2Client.setCredentials(JSON.parse(token.toString()));
-  }
-});
 
 //
 // Configure the Oauth2 client event handler
@@ -209,18 +204,6 @@ passport.deserializeUser(function (id: number, done) {
   });
 });
 
-// const sess = {
-//   secret: process.env.COOKIE_SECRET,
-//   cookie: { secure: false }, // 30 days
-
-//   // TODO: do we want to store these sessions in the DB? Probably yes otherwise
-//   // people get logged out on ever app reboot?
-//   // store:
-
-//   resave: true,
-//   saveUninitialized: false,
-// };
-
 if (app.get("env") === "production") {
   app.set("trust proxy", 1); // trust first proxy
   sess.cookie.secure = true; // serve secure cookies
@@ -259,32 +242,6 @@ app.use((req, res, next) => {
 app.use(passport.initialize());
 app.use(passport.session());
 
-/** Routes */
-app.get("/", (request: Request, response: Response) => {
-  if (Object.keys(oauth2Client.credentials).length === 0) {
-    const scopes = ["https://www.googleapis.com/auth/calendar.events.readonly"];
-
-    // you can force the consent screen here if you really want to for some
-    // reason, such as getting a refresh_token, by passing prompt: 'consent'
-    // into the options below
-    const url = oauth2Client.generateAuthUrl({
-      // 'online' (default) or 'offline' (gets refresh_token)
-      access_type: "offline",
-
-      // If you only need one scope you can pass it as a string
-      scope: scopes,
-    });
-    response.json({
-      message: "Action: Please go to following URL to authorize the app",
-      authUrl: url,
-    });
-  } else {
-    // console.log(`Here's the token read from disk: ${token.toString()}`);
-    // oauth2Client.setCredentials(JSON.parse(token.toString()));
-    response.json({ message: "Success: You're already authorized." });
-  }
-});
-
 //
 // Browser is directed to this route from the login page
 //
@@ -305,7 +262,6 @@ app.get(
 app.get(
   "/auth/google/callback",
   passport.authenticate("google", {
-    // TODO: figure out where you want to redirect people here
     successRedirect: `${process.env.FRONTEND_URI}/dashboard`,
     failureRedirect: `${process.env.FRONTEND_URI}#failed-login`,
   })
@@ -327,9 +283,8 @@ app.get("/unauthenticated", (req, res) => {
 
 app.get("/users/me", ensureUserIsLoggedIn, getCurrentUser);
 
-app.get("/meetings", ensureUserIsLoggedIn, (req, res) => {
-  // app.get("/meetings", (req, res) => {
-  return res.status(200).json([{ id: 1 }, { id: 2 }]);
+app.get("/events", ensureUserIsLoggedIn, (req, res, next) => {
+  getEvents(oauth2Client)(req, res, next);
 });
 
 // TODO: consider turning this into a DELETE /sessions
@@ -342,41 +297,6 @@ app.get("/auth/logout", ensureUserIsLoggedIn, (req, res) => {
     return res.status(200).json({});
   });
 });
-
-app.get(
-  "/oauth2callback",
-  async (request: Request, response: Response, next: NextFunction) => {
-    // might want to check that you actually did get the code here
-    // console.log(request.query.code);
-
-    if (!request.query.code) {
-      throw new Error("Code missing from Oauth2 Callback");
-    }
-
-    const code: string = request.query.code.toString();
-
-    // console.log(code);
-
-    // This will provide an object with the access_token and refresh_token.
-    // Save these somewhere safe so they can be used at a later time.
-    const { tokens } = await oauth2Client.getToken(code);
-
-    oauth2Client.setCredentials(tokens);
-
-    // this would eventually go in a database associated with the specific user
-    fs.writeFile(TOKEN_PATH, JSON.stringify(tokens), (err) => {
-      if (err) return console.error(err);
-      console.log("Token stored to", TOKEN_PATH);
-      next(err);
-    });
-
-    response.json({ message: "Success: Oauth2 client credentials set!" });
-  }
-);
-
-app.get("/events", Event.getEvents(oauth2Client));
-//app.post("/event-trackings", ...);
-//app.delete("/event-trackings/:eventId", ...);
 
 /** Error handling */
 // Has to be defined last
