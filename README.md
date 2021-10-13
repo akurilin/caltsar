@@ -1,3 +1,13 @@
+# Prereqs
+
+You will need liquibase in order to migrate the DB:
+
+`docker pull postgres:13.4`
+`docker volume create postgres-volume`
+`docker pull liquibase/liquibase`
+
+### Sample profile contents you get from the Google API
+
 // Sample Google Profile:
 //
 // {

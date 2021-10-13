@@ -1,7 +1,3 @@
-# prerequisites:
-# docker pull postgres:13.4
-# docker volume create postgres-volume
-
 # delete and restart postgres container
 docker stop postgres13
 docker rm postgres13
