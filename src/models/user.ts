@@ -5,6 +5,8 @@ export interface User {
   firstName: string;
   lastName: string;
   email: string;
+  accessToken: string;
+  refreshToken: string;
 }
 
 export interface UserEntity extends User {
@@ -26,6 +28,8 @@ function convertDBRowToEntity(row: any): UserEntity {
     firstName: row.first_name,
     lastName: row.last_name,
     email: row.email,
+    accessToken: row.access_token,
+    refreshToken: row.refresh_token,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
@@ -37,8 +41,15 @@ export function createUser(
   callback: CallbackFunction
 ): void {
   pool.query(
-    "INSERT INTO users (google_id, first_name, last_name, email) VALUES ($1, $2, $3, $4) RETURNING *",
-    [params.googleId, params.firstName, params.lastName, params.email],
+    "INSERT INTO users (google_id, first_name, last_name, email, access_token, refresh_token) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+    [
+      params.googleId,
+      params.firstName,
+      params.lastName,
+      params.email,
+      params.accessToken,
+      params.refreshToken,
+    ],
     (err, res) => {
       if (err) {
         callback(err, null);
@@ -47,6 +58,37 @@ export function createUser(
       }
     }
   );
+}
+
+export async function updateTokens(
+  pool: Pool,
+  id: number,
+  accessToken: string,
+  refreshToken: string
+): Promise<void> {
+  try {
+    await pool.query(
+      "UPDATE users SET access_token = $1, refresh_token = $2 WHERE id = $3",
+      [accessToken, refreshToken, id]
+    );
+  } catch (err) {
+    console.error(`Could not update user with id ${id}`);
+  }
+}
+
+export async function updateAccessToken(
+  pool: Pool,
+  id: number,
+  accessToken: string
+): Promise<void> {
+  try {
+    await pool.query("UPDATE users SET access_token = $1 WHERE id = $2", [
+      accessToken,
+      id,
+    ]);
+  } catch (err) {
+    console.error(`Could not update user with id ${id}`);
+  }
 }
 
 // TODO: should probably convert this from pool to a connection instead....
@@ -85,7 +127,7 @@ export function findById(
       console.log("User.findById - error");
       callback(err, null);
     } else if (res.rows.length === 1) {
-      console.log(res.rows[0]);
+      // console.log(res.rows[0]);
       callback(null, convertDBRowToEntity(res.rows[0]));
     } else {
       console.log("User.findById - no user found");
@@ -107,4 +149,4 @@ export function findById(
 //   return res?.rows.length === 1 ? convertDBRowToEntity(res.rows[0]) : null;
 // }
 
-export default { findOrCreate, findById };
+// export default { findOrCreate, findById, updateUserTokens };

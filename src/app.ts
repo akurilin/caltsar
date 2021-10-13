@@ -1,5 +1,5 @@
 import http from "http";
-import express, { Express, Request, Response, NextFunction } from "express";
+import express, { Express, Request } from "express";
 import expressSession from "express-session";
 import pgSession from "connect-pg-simple";
 import morgan from "morgan";
@@ -7,7 +7,7 @@ import cors from "cors";
 import helmet from "helmet";
 import * as dotenv from "dotenv";
 import { auth } from "@googleapis/calendar";
-import user, { UserEntity } from "./models/user";
+import * as user from "./models/user";
 import { Pool } from "pg";
 import passport from "passport";
 import {
@@ -64,16 +64,6 @@ pool.on("error", (err) => {
 });
 
 //
-// Configure Google API Oauth client and use credentials from disk for our only test user
-//
-// const TOKEN_PATH = "dist/token.json";
-const oauth2Client = new auth.OAuth2(
-  process.env.CLIENT_ID,
-  process.env.CLIENT_SECRET,
-  "http://localhost:3000/oauth2callback"
-);
-
-//
 // Configure Passport
 //
 
@@ -99,6 +89,13 @@ passport.use(
         );
       }
 
+      console.log(`Access token:${accessToken}`);
+      console.log(`Refresh token token:${refreshToken}`);
+      console.log(`Passport profile:${JSON.stringify(profile)}`);
+
+      //
+      // TODO: UPSERT this operation instead?
+      //
       // find the user, create it if necessary
       user.findOrCreate(
         pool,
@@ -110,53 +107,16 @@ passport.use(
             profile.emails && profile.emails[0]
               ? profile.emails[0].value
               : "NOEMAIL",
+          accessToken: accessToken,
+          refreshToken: refreshToken,
         },
-        (err: Error | null, userItem: UserEntity | null) => {
+        (err: Error | null, userItem: user.UserEntity | null) => {
           return done(err, userItem);
         }
       );
-
-      // Reuse our Passport login credentials inside of the Google API Node
-      // Client
-      // {
-      //   access_token: 'REDACTED_ACCESS_TOKEN_3',
-      //   refresh_token: 'REDACTED_REFRESH_TOKEN_3',
-      // oauth2Client.setCredentials(JSON.parse(token.toString()));
-      oauth2Client.setCredentials({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
     }
   )
 );
-
-//
-// Configure the Oauth2 client event handler
-//
-// The library automatically use the existing refresh token (issued only once
-// at authorization time) to refresh the access token for as long as the refresh
-// token stays valid
-// However once in a blue moon, the refresh token goes stale, and you need to
-// obtain AND STORE a new one wherever you need to
-oauth2Client.on("tokens", (tokens) => {
-  console.log("TOKENS EVENT TRIGGERED!!!!");
-  //
-  // a sample payload looks something like this
-  //
-  // {
-  //   access_token: 'REDACTED_ACCESS_TOKEN_3',
-  //   refresh_token: 'REDACTED_REFRESH_TOKEN_3',
-  //   scope: 'https://www.googleapis.com/auth/calendar.events.readonly',
-  //   token_type: 'Bearer',
-  //   expiry_date: 1633411937822
-  // }
-  if (tokens.refresh_token) {
-    // TODO
-    // store the refresh_token in my persistence storage place
-    console.log(tokens.refresh_token);
-  }
-  console.log(tokens.access_token);
-});
 
 //
 // Express starts here
@@ -199,7 +159,7 @@ passport.serializeUser(function (user: any, done) {
 
 passport.deserializeUser(function (id: number, done) {
   console.log("passport.deserializeUser");
-  user.findById(pool, id, (err: Error | null, user: UserEntity | null) => {
+  user.findById(pool, id, (err: Error | null, user: user.UserEntity | null) => {
     done(err, user);
   });
 });
@@ -253,6 +213,10 @@ app.get(
       "profile",
       "https://www.googleapis.com/auth/calendar.events.readonly",
     ],
+    // tells google to send us a refresh_token so that we can keep using
+    // the Google API on behalf of the user even when they're not actively in
+    // the app
+    accessType: "offline",
   })
 );
 
@@ -284,7 +248,68 @@ app.get("/unauthenticated", (req, res) => {
 app.get("/users/me", ensureUserIsLoggedIn, getCurrentUser);
 
 app.get("/events", ensureUserIsLoggedIn, (req, res, next) => {
-  getEvents(oauth2Client)(req, res, next);
+  const thisUser = req.user as user.UserEntity;
+  if (!thisUser.refreshToken || !thisUser.accessToken) {
+    return res.status(500).json({
+      message:
+        "ERROR: looks like we didn't have Google client credentials for you",
+    });
+  }
+
+  // THOUGHTS: I'm guessing we want to build a map of clients
+  // for each of our users that are in memory and active (and listening to the
+  // refresh event) so that we don't have to end up with an endless pile of
+  // these clients that we keep re-creating for every call
+  const oneTimeClient = new auth.OAuth2(
+    process.env.CLIENT_ID,
+    process.env.CLIENT_SECRET,
+    "http://localhost:3000/oauth2callback"
+  );
+  oneTimeClient.setCredentials({
+    access_token: thisUser.accessToken,
+    refresh_token: thisUser.refreshToken,
+  });
+
+  // The library automatically use the existing refresh token (issued only once
+  // at authorization time) to refresh the access token for as long as the refresh
+  // token stays valid
+  // However once in a blue moon, the refresh token goes stale, and you need to
+  // obtain AND STORE a new one wherever you need to
+  oneTimeClient.on("tokens", (tokens) => {
+    // console.log("TOKENS EVENT TRIGGERED!!!!");
+    //
+    // a sample payload looks something like this
+    //
+    // {
+    //   access_token: 'REDACTED_ACCESS_TOKEN_3',
+    //   refresh_token: 'REDACTED_REFRESH_TOKEN_3',
+    //   scope: 'https://www.googleapis.com/auth/calendar.events.readonly',
+    //   token_type: 'Bearer',
+    //   expiry_date: 1633411937822
+    // }
+    //
+    // TODO: aren't we supposed to check the result of this?
+    //
+    try {
+      if (tokens.refresh_token && tokens.access_token) {
+        console.log("Updating Google Oauth2 refresh token");
+        user.updateTokens(
+          pool,
+          thisUser.id,
+          tokens.access_token,
+          tokens.refresh_token
+        );
+      } else if (tokens.access_token) {
+        console.log("Updating Google Oauth2 access token");
+        user.updateAccessToken(pool, thisUser.id, tokens.access_token);
+      } else {
+        throw new Error("No refresh token or access token given in the event");
+      }
+    } catch (err) {
+      console.error(`Could not refresh tokens for user with id ${thisUser.id}`);
+    }
+  });
+  getEvents(oneTimeClient)(req, res, next);
 });
 
 // TODO: consider turning this into a DELETE /sessions
