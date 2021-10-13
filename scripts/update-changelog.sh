@@ -5,8 +5,5 @@ docker run --network=host --rm -v "$ROOT_FOLDER""$CHANGELOG_FOLDER":/liquibase/c
   --url=jdbc:postgresql://localhost:5432/caltsar_dev \
   --username=postgres \
   --password=password \
-  generateChangeLog \
-  --changeLogFile=/liquibase/changelog/changelog.sql && \
-npx sql-formatter -l postgresql -u < ."$CHANGELOG_FOLDER"/changelog.sql -o \
-  ."$CHANGELOG_FOLDER"/changelog.sql && \
-cat ."$CHANGELOG_FOLDER"/changelog.sql
+  --changeLogFile=changelog.sql \
+  update

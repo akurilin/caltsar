@@ -14,3 +14,5 @@ docker run -d --name=postgres13 -p 5432:5432 -v postgres-volume:/var/lib/postgre
 docker exec -it postgres13 psql -U postgres -c "DROP DATABASE IF EXISTS caltsar_dev"
 docker exec -it postgres13 psql -U postgres -c "CREATE DATABASE caltsar_dev"
 docker exec -it postgres13 psql -U postgres -d caltsar_dev -f /alex/reset.sql
+
+./scripts/update-changelog.sh
