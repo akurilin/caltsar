@@ -73,6 +73,7 @@ export async function updateTokens(
     );
   } catch (err) {
     console.error(`Could not update user with id ${id}`);
+    throw new Error("Could not update user's Google API tokens");
   }
 }
 
@@ -91,7 +92,6 @@ export async function updateAccessToken(
   }
 }
 
-// TODO: should probably convert this from pool to a connection instead....
 export function findOrCreate(
   pool: Pool,
   params: User,
@@ -99,22 +99,52 @@ export function findOrCreate(
 ): void {
   console.log("User.findOrCreate");
   pool.query(
-    "SELECT * FROM users WHERE google_id = $1",
-    [params.googleId],
+    `INSERT INTO users (google_id, first_name, last_name, email, access_token, refresh_token)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (google_id) DO UPDATE SET access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, updated_at = NOW()
+             RETURNING *`,
+    [
+      params.googleId,
+      params.firstName,
+      params.lastName,
+      params.email,
+      params.accessToken,
+      params.refreshToken,
+    ],
     (err, res) => {
       if (err) {
-        console.log("User.findOrCreate - error");
-        callback(err, null);
-      } else if (res.rows.length === 1) {
-        console.log("User.findOrCreate - user found");
-        callback(null, convertDBRowToEntity(res.rows[0]));
+        console.error(err);
+        callback(new Error("Could not create or update user"), null);
       } else {
-        console.log("User.findOrCreate - creating user");
-        createUser(pool, params, callback);
+        callback(null, convertDBRowToEntity(res.rows[0]));
       }
     }
   );
 }
+// pool.query(
+//   "SELECT * FROM users WHERE google_id = $1",
+//   [params.googleId],
+//   (err, res) => {
+//     if (err) {
+//       console.log("User.findOrCreate - error");
+//       callback(err, null);
+//     } else if (res.rows.length === 1) {
+//       console.log("User.findOrCreate - user found");
+//       const dbUser = convertDBRowToEntity(res.rows[0]);
+//       if(dbUser.accessToken != params.accessToken || dbUser.refreshToken != params.refreshToken) {
+//         try {
+//           updateTokens(pool, dbUser.id, params.accessToken, params.refreshToken);
+//           callback(null, convertDBRowToEntity(res.rows[0]));
+//         }
+//       }
+//       callback(null, convertDBRowToEntity(res.rows[0]));
+//     } else {
+//       console.log("User.findOrCreate - creating user");
+//       createUser(pool, params, callback);
+//     }
+//   }
+// );
+// }
 
 export function findById(
   pool: Pool,
