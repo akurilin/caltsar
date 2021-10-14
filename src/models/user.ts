@@ -121,30 +121,6 @@ export function findOrCreate(
     }
   );
 }
-// pool.query(
-//   "SELECT * FROM users WHERE google_id = $1",
-//   [params.googleId],
-//   (err, res) => {
-//     if (err) {
-//       console.log("User.findOrCreate - error");
-//       callback(err, null);
-//     } else if (res.rows.length === 1) {
-//       console.log("User.findOrCreate - user found");
-//       const dbUser = convertDBRowToEntity(res.rows[0]);
-//       if(dbUser.accessToken != params.accessToken || dbUser.refreshToken != params.refreshToken) {
-//         try {
-//           updateTokens(pool, dbUser.id, params.accessToken, params.refreshToken);
-//           callback(null, convertDBRowToEntity(res.rows[0]));
-//         }
-//       }
-//       callback(null, convertDBRowToEntity(res.rows[0]));
-//     } else {
-//       console.log("User.findOrCreate - creating user");
-//       createUser(pool, params, callback);
-//     }
-//   }
-// );
-// }
 
 export function findById(
   pool: Pool,
@@ -165,18 +141,3 @@ export function findById(
     }
   });
 }
-
-// export async function findByIdPromise(
-//   pool: Pool,
-//   id: number
-// ): Promise<User | null> {
-//   let res = null;
-//   try {
-//     res = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
-//   } catch (err) {
-//     console.log("User.findById - error");
-//   }
-//   return res?.rows.length === 1 ? convertDBRowToEntity(res.rows[0]) : null;
-// }
-
-// export default { findOrCreate, findById, updateUserTokens };
