@@ -98,6 +98,12 @@ export function findOrCreate(
   callback: CallbackFunction
 ): void {
   console.log("User.findOrCreate");
+
+  // these's a chance that this conflicts on email, as opposed to the google_id,
+  // and I'm not sure what exactly to do in that case given that both columns
+  // are unique. One would hope that PG is clever enough to not arbitrary cycle
+  // through conflict targets and pick one, but instead instead prioritizes the
+  // one chosen in the ON CONFLICT clause
   pool.query(
     `INSERT INTO users (google_id, first_name, last_name, email, access_token, refresh_token)
              VALUES ($1, $2, $3, $4, $5, $6)

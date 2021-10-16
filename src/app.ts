@@ -15,7 +15,7 @@ import {
 } from "passport-google-oauth2";
 import { getCurrentUser } from "./handlers/userhandler";
 import { ensureUserIsLoggedIn } from "./handlers/auth";
-import { getEvents } from "./handlers/events";
+import { handleEvents } from "./handlers/events";
 import { idToClient, upsertGoogleAPIClient } from "./googleapiclients";
 
 // initialize this to be empty
@@ -274,7 +274,7 @@ app.get("/events", ensureUserIsLoggedIn, (req, res, next) => {
       thisUser.accessToken,
       thisUser.refreshToken
     );
-    getEvents(client)(req, res, next);
+    handleEvents(client)(req, res, next);
   }
 });
 
