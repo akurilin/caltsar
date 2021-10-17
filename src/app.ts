@@ -1,4 +1,3 @@
-import http from "http";
 import express, { Express, Request } from "express";
 import expressSession from "express-session";
 import pgSession from "connect-pg-simple";
@@ -39,13 +38,12 @@ if (
   console.error("The app is missing a mandatory environment variable");
   process.exit(1);
 }
-const PORT: number = parseInt(process.env.PORT as string, 10);
 
 //
 // Configure Postgres
 //
 
-const pool = new Pool();
+export const pool = new Pool();
 
 //
 // uncomment the below just to sanity check the PG connection settings
@@ -302,12 +300,5 @@ app.use((req, res) => {
     message: error.message,
   });
 });
-
-/** Server */
-const httpServer = http.createServer(app);
-
-httpServer.listen(PORT, () =>
-  console.log(`The server is running on port ${PORT}`)
-);
 
 export default app;

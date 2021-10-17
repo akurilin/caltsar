@@ -2,11 +2,12 @@
   "name": "caltsar2",
   "version": "1.0.0",
   "description": "",
-  "main": "src/app.ts",
+  "main": "src/server.ts",
   "scripts": {
-    "dev": "PORT=3000 nodemon src/app.ts",
+    "dev": "PORT=3000 nodemon src/server.ts",
     "build": "rm -rf ./dist/ && npx prettier --check . && npx eslint . --ext .js,.jsx,.ts,.tsx && tsc",
-    "test": "PORT=4000 jest --detectOpenHandles --watchAll"
+    "test": "PORT=4000 jest --detectOpenHandles",
+    "test:watch": "PORT=4000 jest --detectOpenHandles --watchAll"
   },
   "author": "",
   "license": "ISC",

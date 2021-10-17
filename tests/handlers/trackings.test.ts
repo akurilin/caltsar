@@ -1,12 +1,15 @@
-import app from "../../src/app";
+import app, { pool } from "../../src/app";
 // import http from "http";
 // import { Express } from "express";
 import request from "supertest";
 
 // let server: Express;
 
-beforeAll(async () => {
-  // server = await http.createServer(app);
+// beforeAll(async () => {});
+afterAll(async () => {
+  // you'll want to be careful with this since it can only be called once per
+  // run unless you're planning to re-populate the pool
+  await pool.end();
 });
 
 describe("DELETE /trackings/123", () => {
