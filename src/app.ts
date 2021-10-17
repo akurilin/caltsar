@@ -272,7 +272,16 @@ app.get("/events", ensureUserIsLoggedIn, (req, res, next) => {
   }
 });
 
-app.post("/trackings", ensureUserIsLoggedIn, Trackings.handlePost);
+app.post(
+  "/trackings/:recurringEventId",
+  ensureUserIsLoggedIn,
+  Trackings.handlePost
+);
+app.delete(
+  "/trackings/:recurringEventId",
+  ensureUserIsLoggedIn,
+  Trackings.handleDelete
+);
 
 // TODO: consider turning this into a DELETE /sessions
 app.get("/auth/logout", ensureUserIsLoggedIn, (req, res) => {
