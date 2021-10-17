@@ -10,8 +10,25 @@ on:
     branches: [main]
 
 jobs:
+
   build:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:13.4
+        env:
+          POSTGRES_DB: caltsar_test
+          POSTGRES_PASSWORD: password
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     strategy:
       matrix:
@@ -19,7 +36,18 @@ jobs:
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
+      - run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+          sudo apt-get install --yes tree
+      - run: psql -h localhost -d caltsar_test -U postgres -c 'SELECT 1;'
+        env:
+          PGPASSWORD: password
       - uses: actions/checkout@v2
+      - run: tree
+      - run: psql -h localhost -d caltsar_test -U postgres -f ./sql/changelog/changelog.sql
+        env:
+          PGPASSWORD: password
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2
         with:
@@ -27,4 +55,15 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run build --if-present
-      - run: CLIENT_ID=foo CLIENT_SECRET=bar NODE_ENV=development PGUSER=postgres PGHOST=localhost PGPASSWORD=password PGDATABASE=caltsar_test PGPORT=5432 COOKIE_SECRET=test FRONTEND_URI=http://localhost:3001 npm test
+      - run: npm test
+        env:
+          CLIENT_ID: foo
+          CLIENT_SECRET: bar
+          NODE_DEV: development
+          PGUSER: postgres
+          PGHOST: localhost
+          PGPASSWORD: password
+          PGDATABASE: caltsar_test
+          PGPORT: 5432
+          COOKIE_SECRET: bad kitty
+          FRONTEND_URI: http://localhost:3001
