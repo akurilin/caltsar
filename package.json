@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "PORT=3000 nodemon src/server.ts",
     "build": "rm -rf ./dist/ && npx prettier --check . && npx eslint . --ext .js,.jsx,.ts,.tsx && tsc",
-    "test": "rm -rf ./dist/ && PORT=4000 jest --detectOpenHandles --passWithNoTests",
-    "test:watch": "PORT=4000 jest --detectOpenHandles --watchAll"
+    "test": "rm -rf ./dist/ && PGDATABASE=caltsar_test PORT=4000 jest --detectOpenHandles --passWithNoTests",
+    "test:watch": "PGDATABASE=caltsar_test PORT=4000 jest --detectOpenHandles --watchAll"
   },
   "author": "",
   "license": "ISC",
