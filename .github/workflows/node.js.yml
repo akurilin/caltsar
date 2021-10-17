@@ -27,4 +27,4 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run build --if-present
-      - run: npm test
+      - run: CLIENT_ID=foo CLIENT_SECRET=bar NODE_ENV=development PGUSER=postgres PGHOST=localhost PGPASSWORD=password PGDATABASE=caltsar_test PGPORT=5432 COOKIE_SECRET=test FRONTEND_URI=http://localhost:3001 npm test
