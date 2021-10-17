@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import { GaxiosError } from "gaxios";
 import { OAuth2Client } from "googleapis-common";
 
-export function handleEvents(oauth2Client: OAuth2Client) {
+export function handleGet(oauth2Client: OAuth2Client) {
   return async (
     request: Request,
     response: Response,

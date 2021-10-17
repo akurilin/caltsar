@@ -13,10 +13,11 @@ import {
   Strategy as GoogleStrategy,
   VerifyCallback,
 } from "passport-google-oauth2";
-import { getCurrentUser } from "./handlers/userhandler";
-import { ensureUserIsLoggedIn } from "./handlers/auth";
-import { handleEvents } from "./handlers/events";
 import { idToClient, upsertGoogleAPIClient } from "./googleapiclients";
+import { ensureUserIsLoggedIn } from "./handlers/auth";
+import { getCurrentUser } from "./handlers/userhandler";
+import * as Events from "./handlers/events";
+import * as Trackings from "./handlers/trackings";
 
 // initialize this to be empty
 const googleAPIClients: idToClient = {};
@@ -136,7 +137,23 @@ passport.use(
 const app: Express = express();
 
 app.use(helmet());
-app.use(cors());
+
+//
+// CORS
+//
+const corsOptions = {
+  origin: process.env.FRONTEND_URI,
+  credentials: true,
+};
+// Consider this as well at some point
+//   res.header(
+//     "Access-Control-Allow-Headers",
+//     "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+//   );
+
+// apply cors to ALL routes
+app.use(cors(corsOptions));
+
 app.use(express.json());
 
 /** Logging */
@@ -182,35 +199,12 @@ if (app.get("env") === "production") {
 }
 
 app.use(expressSession(sess));
-// app.use(specializedSession(sess));
 
 /** Parse the request */
 app.use(express.urlencoded({ extended: false }));
 
 /** Takes care of JSON data */
 app.use(express.json());
-
-// /** RULES OF OUR API */
-app.use((req, res, next) => {
-  // set the CORS policy
-  // res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Origin", process.env.FRONTEND_URI);
-  res.header("Access-Control-Allow-Credentials", "true");
-  // doesn't seem necessary
-  // res.header("Vary", "Origin");
-  // set the CORS headers
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-  );
-  // set the CORS method headers
-  if (req.method === "OPTIONS") {
-    res.header("Access-Control-Allow-Methods", "GET PATCH DELETE POST");
-    return res.status(200).json({});
-  }
-  next();
-});
-
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -244,18 +238,18 @@ app.get(
 );
 
 // 2x test routes to test authentication
-app.get("/authenticated", ensureUserIsLoggedIn, (req, res) => {
-  console.log(req.user);
-  return res.status(200).json({ message: "YES, you are authenticated" });
-});
+// app.get("/authenticated", ensureUserIsLoggedIn, (req, res) => {
+//   console.log(req.user);
+//   return res.status(200).json({ message: "YES, you are authenticated" });
+// });
 
-app.get("/unauthenticated", (req, res) => {
-  if (!req.user) {
-    return res.status(200).json({ message: "YES, you are unauthenticated" });
-  } else {
-    return res.status(200).json({ message: "NO, you are not unauthenticated" });
-  }
-});
+// app.get("/unauthenticated", (req, res) => {
+//   if (!req.user) {
+//     return res.status(200).json({ message: "YES, you are unauthenticated" });
+//   } else {
+//     return res.status(200).json({ message: "NO, you are not unauthenticated" });
+//   }
+// });
 
 app.get("/users/me", ensureUserIsLoggedIn, getCurrentUser);
 
@@ -274,9 +268,11 @@ app.get("/events", ensureUserIsLoggedIn, (req, res, next) => {
       thisUser.accessToken,
       thisUser.refreshToken
     );
-    handleEvents(client)(req, res, next);
+    Events.handleGet(client)(req, res, next);
   }
 });
+
+app.post("/trackings", ensureUserIsLoggedIn, Trackings.handlePost);
 
 // TODO: consider turning this into a DELETE /sessions
 app.get("/auth/logout", ensureUserIsLoggedIn, (req, res) => {
