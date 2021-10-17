@@ -309,3 +309,5 @@ const httpServer = http.createServer(app);
 httpServer.listen(PORT, () =>
   console.log(`The server is running on port ${PORT}`)
 );
+
+export default app;
