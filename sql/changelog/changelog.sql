@@ -35,3 +35,10 @@ CREATE INDEX "IDX_session_expire" ON "public"."sessions"("expire");
 ALTER TABLE public.users
   ADD COLUMN access_token text NOT NULL,
   ADD COLUMN refresh_token text NOT NULL;
+
+-- changeset alex:1636743378
+CREATE TABLE public.trackings (
+  recurring_event_id text PRIMARY KEY,
+  user_id integer REFERENCES users(id) NOT NULL,
+  created_at timestamp with time zone DEFAULT NOW() NOT NULL
+);

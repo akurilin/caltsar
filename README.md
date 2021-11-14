@@ -6,6 +6,12 @@ You will need liquibase in order to migrate the DB:
 `docker volume create postgres-volume`
 `docker pull liquibase/liquibase`
 
+### Liquibase add new migration
+
+Generate new timestamp for the migration as
+
+`date +"%s"`
+
 ### Sample profile contents you get from the Google API
 
 // Sample Google Profile:

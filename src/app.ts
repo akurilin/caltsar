@@ -1,4 +1,4 @@
-import express, { Express, Request } from "express";
+import express, { Express, Request, Response, NextFunction } from "express";
 import expressSession from "express-session";
 import pgSession from "connect-pg-simple";
 import morgan from "morgan";
@@ -13,10 +13,26 @@ import {
   VerifyCallback,
 } from "passport-google-oauth2";
 import { idToClient, upsertGoogleAPIClient } from "./googleapiclients";
-import { ensureUserIsLoggedIn } from "./handlers/auth";
+import { ensureUserIsLoggedIn, injectDBPool } from "./middleware";
 import { getCurrentUser } from "./handlers/userhandler";
 import * as Events from "./handlers/events";
 import * as Trackings from "./handlers/trackings";
+
+// declaration merging
+declare global {
+  /* eslint-disable @typescript-eslint/no-namespace */
+  namespace Express {
+    // Inject additional properties on express.Request
+    interface Request {
+      // ? - I'm not clear how to express the idea that the pool is not set at
+      // the beginning of the request's existence until it's injected through
+      // middleware without making it optional and adding a check in every
+      // handler, which is laborious
+      //
+      pool: Pool;
+    }
+  }
+}
 
 // initialize this to be empty
 const googleAPIClients: idToClient = {};
@@ -273,11 +289,13 @@ app.get("/events", ensureUserIsLoggedIn, (req, res, next) => {
 app.post(
   "/trackings/:recurringEventId",
   ensureUserIsLoggedIn,
+  injectDBPool(pool),
   Trackings.handlePost
 );
 app.delete(
   "/trackings/:recurringEventId",
   ensureUserIsLoggedIn,
+  injectDBPool(pool),
   Trackings.handleDelete
 );
 
