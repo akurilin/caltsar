@@ -286,6 +286,12 @@ app.get("/events", ensureUserIsLoggedIn, (req, res, next) => {
   }
 });
 
+app.get(
+  "/trackings",
+  ensureUserIsLoggedIn,
+  injectDBPool(pool),
+  Trackings.handleGet
+);
 app.post(
   "/trackings/:recurringEventId",
   ensureUserIsLoggedIn,
