@@ -1,4 +1,4 @@
-import express, { Express, Request, Response, NextFunction } from "express";
+import express, { Express, Request } from "express";
 import expressSession from "express-session";
 import pgSession from "connect-pg-simple";
 import morgan from "morgan";
@@ -12,8 +12,13 @@ import {
   Strategy as GoogleStrategy,
   VerifyCallback,
 } from "passport-google-oauth2";
+import { OAuth2Client } from "google-auth-library";
 import { idToClient, upsertGoogleAPIClient } from "./googleapiclients";
-import { ensureUserIsLoggedIn, injectDBPool } from "./middleware";
+import {
+  ensureUserIsLoggedIn,
+  injectDBPool,
+  injectGoogleClient,
+} from "./middleware";
 import { getCurrentUser } from "./handlers/userhandler";
 import * as Events from "./handlers/events";
 import * as Trackings from "./handlers/trackings";
@@ -30,6 +35,7 @@ declare global {
       // handler, which is laborious
       //
       pool: Pool;
+      googleClient: OAuth2Client;
     }
   }
 }
@@ -269,6 +275,7 @@ app.get("/users/me", ensureUserIsLoggedIn, getCurrentUser);
 
 app.get("/events", ensureUserIsLoggedIn, (req, res, next) => {
   const thisUser = req.user as user.UserEntity;
+
   if (!thisUser.refreshToken || !thisUser.accessToken) {
     return res.status(500).json({
       message:
@@ -296,6 +303,7 @@ app.post(
   "/trackings/:recurringEventId",
   ensureUserIsLoggedIn,
   injectDBPool(pool),
+  injectGoogleClient(googleAPIClients),
   Trackings.handlePost
 );
 app.delete(

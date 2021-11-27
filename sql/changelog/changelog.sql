@@ -37,8 +37,22 @@ ALTER TABLE public.users
   ADD COLUMN refresh_token text NOT NULL;
 
 -- changeset alex:1636743378
-CREATE TABLE public.trackings (
-  recurring_event_id text PRIMARY KEY,
-  user_id integer REFERENCES users(id) NOT NULL,
-  created_at timestamp with time zone DEFAULT NOW() NOT NULL
+CREATE TABLE recurring_events (
+  google_id text PRIMARY KEY,
+  summary text NOT NULL,
+  tracked boolean NOT NULL,
+  created_at timestamptz DEFAULT NOW() NOT NULL
+);
+
+-- CREATE TABLE trackings (
+--  recurring_event_google_id text REFERENCES recurring_events(google_id) PRIMARY KEY,
+--  user_id integer REFERENCES users(id) NOT NULL,
+--  created_at timestamp with time zone DEFAULT NOW() NOT NULL
+-- );
+
+CREATE TABLE events (
+  google_id text PRIMARY KEY,
+  recurring_event_google_id text REFERENCES recurring_events(google_id) NOT NULL,
+  end_date_time timestamp NOT NULL,
+  time_zone text NOT NULL
 );

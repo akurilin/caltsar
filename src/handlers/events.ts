@@ -18,6 +18,10 @@ export function handleGet(oauth2Client: OAuth2Client) {
         calendarId: "primary",
         timeMin: new Date().toISOString(),
         maxResults: 10,
+        // This parameter makes a huge difference to the output. With this on
+        // default you get only the base recurring event with RRULE and the
+        // exception one-offs, whereas without it you get the whole collection
+        // of everything fully expanded, which is a big deal
         singleEvents: true,
         orderBy: "startTime",
       },

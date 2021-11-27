@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { Pool } from "pg";
+import { idToClient, upsertGoogleAPIClient } from "./googleapiclients";
+import * as user from "./models/user";
 
 //
 // Make used to protect authenticated route from unauthed access
@@ -14,6 +16,30 @@ export function ensureUserIsLoggedIn(
   } else {
     next();
   }
+}
+
+export function injectGoogleClient(googleAPIClients: idToClient) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      throw new Error("No signed in user for google client prep");
+    }
+    if (!req.pool) {
+      throw new Error("No PG pool ready for google client prep");
+    }
+
+    const thisUser = req.user as user.UserEntity;
+
+    const client = upsertGoogleAPIClient(
+      req.pool,
+      googleAPIClients,
+      thisUser.id,
+      thisUser.accessToken,
+      thisUser.refreshToken
+    );
+
+    req.googleClient = client;
+    next();
+  };
 }
 
 //
