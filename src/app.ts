@@ -273,25 +273,33 @@ app.get(
 
 app.get("/users/me", ensureUserIsLoggedIn, getCurrentUser);
 
-app.get("/events", ensureUserIsLoggedIn, (req, res, next) => {
-  const thisUser = req.user as user.UserEntity;
+// app.get("/events", ensureUserIsLoggedIn, (req, res, next) => {
+//   const thisUser = req.user as user.UserEntity;
 
-  if (!thisUser.refreshToken || !thisUser.accessToken) {
-    return res.status(500).json({
-      message:
-        "ERROR: looks like we didn't have Google client credentials for you",
-    });
-  } else {
-    const client = upsertGoogleAPIClient(
-      pool,
-      googleAPIClients,
-      thisUser.id,
-      thisUser.accessToken,
-      thisUser.refreshToken
-    );
-    Events.handleGet(client)(req, res, next);
-  }
-});
+//   if (!thisUser.refreshToken || !thisUser.accessToken) {
+//     return res.status(500).json({
+//       message:
+//         "ERROR: looks like we didn't have Google client credentials for you",
+//     });
+//   } else {
+//     const client = upsertGoogleAPIClient(
+//       pool,
+//       googleAPIClients,
+//       thisUser.id,
+//       thisUser.accessToken,
+//       thisUser.refreshToken
+//     );
+//     Events.handleGet(client)(req, res, next);
+//   }
+// });
+
+app.get(
+  "/events",
+  ensureUserIsLoggedIn,
+  injectDBPool(pool),
+  injectGoogleClient(googleAPIClients),
+  Events.handleGet
+);
 
 app.get(
   "/trackings",

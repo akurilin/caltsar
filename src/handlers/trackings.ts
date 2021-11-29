@@ -80,8 +80,8 @@ export async function handleGet(
 
 export async function handlePost(
   req: Request,
-  res: Response
-  // next: NextFunction
+  res: Response,
+  next: NextFunction
 ): Promise<void> {
   const pool = req.pool;
   const pgClient = await pool.connect();
@@ -160,7 +160,7 @@ export async function handlePost(
     }
   } catch (e) {
     await pgClient.query("ROLLBACK");
-    throw e;
+    next(e);
   } finally {
     pgClient.release();
   }
@@ -185,7 +185,11 @@ export async function handleDelete(req: Request, res: Response): Promise<void> {
 
 // This sync only does work for the next two weeks, everything else gets wiped
 // if it has no associated records in the system
-export async function handleSync(req: Request, res: Response): Promise<void> {
+export async function handleSync(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   const pool = req.pool;
   const pgClient = await pool.connect();
   const googleClient = req.googleClient;
@@ -265,7 +269,7 @@ export async function handleSync(req: Request, res: Response): Promise<void> {
     await pgClient.query("COMMIT");
   } catch (e) {
     await pgClient.query("ROLLBACK");
-    throw e;
+    next(e);
   } finally {
     pgClient.release();
   }
