@@ -312,6 +312,13 @@ app.delete(
   injectDBPool(pool),
   Trackings.handleDelete
 );
+app.get(
+  "/sync",
+  ensureUserIsLoggedIn,
+  injectDBPool(pool),
+  injectGoogleClient(googleAPIClients),
+  Trackings.handleSync
+);
 
 // TODO: consider turning this into a DELETE /sessions
 app.get("/auth/logout", ensureUserIsLoggedIn, (req, res) => {

@@ -1,5 +1,66 @@
 import { Request, Response, NextFunction } from "express";
 import { calendar_v3 } from "@googleapis/calendar";
+import pgformat from "pg-format";
+import { PoolClient } from "pg";
+
+async function upsertInstances(
+  pgClient: PoolClient,
+  instances: calendar_v3.Schema$Event[]
+) {
+  const values = instances
+    .filter((item) => item.status != "cancelled")
+    .map((item) => {
+      if (!item.end || !item.end.dateTime || !item.end.timeZone) {
+        throw new Error("The event is missing end time properties");
+      }
+      return [
+        item.id,
+        item.recurringEventId,
+        new Date(item.end.dateTime),
+        item.end.timeZone,
+      ];
+    });
+
+  console.log(`Upserting event instances:`);
+  values.forEach((v) => console.log(v));
+
+  const insertEventsQuery = pgformat(
+    "INSERT INTO events (google_id, recurring_event_google_id, end_date_time, time_zone) VALUES %L ON CONFLICT (google_id) DO UPDATE SET end_date_time = EXCLUDED.end_date_time, time_zone = EXCLUDED.time_zone",
+    values
+  );
+  await pgClient.query(insertEventsQuery);
+}
+
+// NB: this is likely the wrong response if the user has already some
+//     data associated here unless they explicitly want to delete all of the
+//     data and don't care about preserving history
+async function deleteRecurring(
+  pgClient: PoolClient,
+  instances: calendar_v3.Schema$Event[]
+) {
+  const cancelledGoogleIds = instances.map((item) => item.id);
+  console.log(`DELETE-ing all recurring_events with ids:`);
+  console.log(cancelledGoogleIds);
+  const deleteQuery = pgformat(
+    "DELETE FROM recurring_events WHERE google_id in (%L)",
+    cancelledGoogleIds
+  );
+  await pgClient.query(deleteQuery);
+}
+
+async function deleteInstances(
+  pgClient: PoolClient,
+  instances: calendar_v3.Schema$Event[]
+) {
+  const cancelledGoogleIds = instances.map((item) => item.id);
+  console.log(`DELETE-ing all events instances with ids:`);
+  console.log(cancelledGoogleIds);
+  const deleteQuery = pgformat(
+    "DELETE FROM events WHERE google_id in (%L)",
+    cancelledGoogleIds
+  );
+  await pgClient.query(deleteQuery);
+}
 
 // just for testing
 export async function handleGet(
@@ -22,68 +83,81 @@ export async function handlePost(
   res: Response
   // next: NextFunction
 ): Promise<void> {
-  // TODO:
-  // 1) Download two weeks worth of events
-  // 2) Store events in the db AND change the tracking of of the recurring
-  // event in the same transaction for the sake of consistency
-  // 3) Create push notification subscription with Google API ASSUMING TRACKING
-  // THE RECURRING EVENT WILL TRACK ALL OF THE SUB-EVENTS AND YOU DON'T HAVE TO
-  // TRACK THEM ALL INDIVIDUALLY YIKES...
-
   const pool = req.pool;
   const pgClient = await pool.connect();
   const googleClient = req.googleClient;
   const recurringEventId = req.params.recurringEventId;
-  const calendar: calendar_v3.Calendar = new calendar_v3.Calendar({
+  const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
     auth: googleClient,
   });
 
   try {
-    console.log("Calling Google Calendar API");
+    // console.log("Calling Google Calendar API");
 
-    // TODO: convert this call to getting a list of events
-    const getResult = await calendar.events.get({
+    // this call is mostly only needed to get an authoritative summary name
+    // assuming we can't trust instances to be representative of the true title
+    const getResult = await calendarAPI.events.get({
       calendarId: "primary",
       eventId: recurringEventId,
       maxAttendees: 1,
     });
-
-    const now = new Date();
-    const twoWeeksLater = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 14);
-
-    const params = {
-      calendarId: "primary",
-      eventId: recurringEventId,
-      timeMin: new Date().toISOString(),
-      timeMax: twoWeeksLater.toISOString(),
-      // NB: this might make a difference here if we're looking for events that
-      // are going to be skipped ad-hoc and we don't want to blast people about
-      // them
-      // showDeleted: true,
-    };
-
-    // console.log(params);
-
-    const listResult = await calendar.events.instances(params);
-
-    console.log(listResult.data.items);
-
-    // optimistically proceeding here assuming a 200 response, but of course
-    // the event might have gotten deleted at some point in the past
     const event: calendar_v3.Schema$Event = getResult.data;
 
-    await pgClient.query("BEGIN");
-    await pgClient.query(
-      "INSERT INTO recurring_events (google_id, summary, tracked) VALUES ($1, $2, $3) ON CONFLICT (google_id) DO NOTHING",
-      [event.id, event.summary, true]
-    );
+    // it's possible to call this against a recurring event that's cancelled,
+    // in which case it doesn't make sense for us to do anything, and we should
+    // just leave it alone
+    if (event.status != "cancelled") {
+      // fetch and store active instances of the recurring event for the next
+      // period of time
+      const now = new Date();
+      const twoWeeksLater = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 14);
+      const listResult = await calendarAPI.events.instances({
+        calendarId: "primary",
+        eventId: recurringEventId,
+        timeMin: new Date().toISOString(),
+        timeMax: twoWeeksLater.toISOString(),
+        // NB: this might make a difference here if we're looking for events that
+        // are going to be skipped ad-hoc and we don't want to blast people about
+        // them
+        showDeleted: true,
+      });
 
-    // const events: calendar;
+      await pgClient.query("BEGIN");
 
-    await pgClient.query("COMMIT");
-    res
-      .status(200)
-      .json({ message: "TODO: IMPLEMENT ME Tracking initiated successfully" });
+      await pgClient.query(
+        "INSERT INTO recurring_events (google_id, summary, tracked) VALUES ($1, $2, $3) ON CONFLICT (google_id) DO NOTHING",
+        [event.id, event.summary, true]
+      );
+
+      if (!listResult.data) {
+        throw new Error("The recurring event was associated with no events");
+      }
+      if (!listResult.data.items || listResult.data.items.length === 0) {
+        throw new Error("The recurring event was associated with no events");
+      }
+
+      await upsertInstances(
+        pgClient,
+        listResult.data.items.filter((i) => i.status !== "cancelled")
+      );
+
+      // delete cancelled events
+      // NB: this will blow up once something starts pointing at these events
+      await deleteInstances(
+        pgClient,
+        listResult.data.items.filter((i) => i.status === "cancelled")
+      );
+
+      // TODO: subscribe to Google's notifications for this recurring event
+      await pgClient.query("COMMIT");
+      res.status(200).json({
+        message: "Tracking initiated successfully",
+      });
+    } else {
+      res.status(400).json({
+        message: "The recurring event is cancelled, nothing to track",
+      });
+    }
   } catch (e) {
     await pgClient.query("ROLLBACK");
     throw e;
@@ -107,10 +181,94 @@ export async function handleDelete(req: Request, res: Response): Promise<void> {
 // if message type is "exists" then check if you even have something with that
 // resource ID and if you do go ahead and
 // }
+//
 
-// export async function handlePostFullResync(
-//   req: Request,
-//   res: Response
-// ): Promise<void> {
-//   res.status(404).json({ message: "TODO: IMPLEMENT ME full resync of events" });
-// }
+// This sync only does work for the next two weeks, everything else gets wiped
+// if it has no associated records in the system
+export async function handleSync(req: Request, res: Response): Promise<void> {
+  const pool = req.pool;
+  const pgClient = await pool.connect();
+  const googleClient = req.googleClient;
+  const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
+    auth: googleClient,
+  });
+
+  try {
+    await pgClient.query("BEGIN");
+
+    // query all recurring events that will occur in the future currently
+    // visible to us through the API
+    const allEvents = await calendarAPI.events.list({
+      calendarId: "primary",
+      singleEvents: false,
+      showDeleted: true,
+      timeMin: new Date().toISOString(),
+    });
+
+    // console.log(allEvents);
+    if (!allEvents.data || !allEvents.data.items) {
+      throw new Error("Could not fetch full list of events");
+    }
+
+    // clean up recurring events that have been deleted from Google Calendar
+    const cancelledRecurring = allEvents.data.items.filter(
+      (e) =>
+        e.status === "cancelled" &&
+        Object.prototype.hasOwnProperty.call(e, "recurrence")
+    );
+    await deleteRecurring(pgClient, cancelledRecurring);
+
+    // 1. fetch all currently tracked recurring events for this user
+    const recurringEvents = await pgClient.query(
+      "SELECT * FROM recurring_events WHERE tracked = true",
+      []
+    );
+
+    const now = new Date();
+    const twoWeeksLater = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 14);
+
+    const promises = recurringEvents.rows.map((event) => {
+      return calendarAPI.events.instances({
+        calendarId: "primary",
+        eventId: event["google_id"],
+        timeMin: new Date().toISOString(),
+        timeMax: twoWeeksLater.toISOString(),
+        // NB: this might make a difference here if we're looking for events that
+        // are going to be skipped ad-hoc and we don't want to blast people about
+        // them
+        showDeleted: true,
+      });
+    });
+
+    const resolved = await Promise.all(promises);
+    let allInstances: calendar_v3.Schema$Event[] = [];
+    resolved.forEach((promise) => {
+      if (promise.data.items) {
+        allInstances = allInstances.concat(promise.data.items);
+      }
+    });
+
+    await upsertInstances(
+      pgClient,
+      allInstances.filter((i) => i.status !== "cancelled")
+    );
+
+    // delete cancelled events
+    // NB: this will blow up once something starts pointing at these events
+    await deleteInstances(
+      pgClient,
+      allInstances.filter((i) => i.status === "cancelled")
+    );
+
+    // TODO: subscribe to push notifications for each recurring event
+
+    await pgClient.query("COMMIT");
+  } catch (e) {
+    await pgClient.query("ROLLBACK");
+    throw e;
+  } finally {
+    pgClient.release();
+  }
+
+  res.status(200).json({ message: "Completed full resync of events" });
+}

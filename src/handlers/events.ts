@@ -24,6 +24,7 @@ export function handleGet(oauth2Client: OAuth2Client) {
         // of everything fully expanded, which is a big deal
         singleEvents: true,
         orderBy: "startTime",
+        showDeleted: true,
       },
       // not sure how to turn this generic Error into something I can query
       (err, res) => {
