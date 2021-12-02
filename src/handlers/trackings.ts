@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { calendar_v3 } from "@googleapis/calendar";
 import pgformat from "pg-format";
 import { PoolClient } from "pg";
+import { UserEntity } from "../models/user";
 
 async function upsertInstances(
   pgClient: PoolClient,
@@ -91,6 +92,7 @@ export async function handlePost(
   res: Response,
   next: NextFunction
 ): Promise<void> {
+  const user = req.user as UserEntity;
   const pool = req.pool;
   const pgClient = await pool.connect();
   const googleClient = req.googleClient;
@@ -111,10 +113,14 @@ export async function handlePost(
     });
     const event: calendar_v3.Schema$Event = getResult.data;
 
-    // it's possible to call this against a recurring event that's cancelled,
-    // in which case it doesn't make sense for us to do anything, and we should
-    // just leave it alone
-    if (event.status != "cancelled") {
+    // Handle all the common error cases
+    if (event.organizer && event.organizer.email != user.email) {
+      res
+        .status(400)
+        .json({ message: "Only the organizer can track a recurring event" });
+    } else if (event.status === "cancelled") {
+      res.status(400).json({ message: "You cannot track a cancelled event" });
+    } else {
       // fetch and store active instances of the recurring event for the next
       // period of time
       const now = new Date();
@@ -160,10 +166,6 @@ export async function handlePost(
       await pgClient.query("COMMIT");
       res.status(200).json({
         message: "Tracking initiated successfully",
-      });
-    } else {
-      res.status(400).json({
-        message: "The recurring event is cancelled, nothing to track",
       });
     }
   } catch (e) {
