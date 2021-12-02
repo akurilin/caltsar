@@ -318,6 +318,7 @@ app.delete(
   "/trackings/:recurringEventId",
   ensureUserIsLoggedIn,
   injectDBPool(pool),
+  injectGoogleClient(googleAPIClients),
   Trackings.handleDelete
 );
 app.get(

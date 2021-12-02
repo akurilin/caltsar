@@ -34,32 +34,40 @@ async function upsertInstances(
 // NB: this is likely the wrong response if the user has already some
 //     data associated here unless they explicitly want to delete all of the
 //     data and don't care about preserving history
-async function deleteRecurring(
+function deleteRecurring(
   pgClient: PoolClient,
   instances: calendar_v3.Schema$Event[]
 ) {
   const cancelledGoogleIds = instances.map((item) => item.id);
   console.log(`DELETE-ing all recurring_events with ids:`);
   console.log(cancelledGoogleIds);
-  const deleteQuery = pgformat(
-    "DELETE FROM recurring_events WHERE google_id in (%L)",
-    cancelledGoogleIds
-  );
-  await pgClient.query(deleteQuery);
+  if (cancelledGoogleIds.length > 0) {
+    const deleteQuery = pgformat(
+      "DELETE FROM recurring_events WHERE google_id in (%L)",
+      cancelledGoogleIds
+    );
+    return pgClient.query(deleteQuery);
+  } else {
+    return Promise.resolve(0);
+  }
 }
 
-async function deleteInstances(
+function deleteInstances(
   pgClient: PoolClient,
   instances: calendar_v3.Schema$Event[]
 ) {
   const cancelledGoogleIds = instances.map((item) => item.id);
   console.log(`DELETE-ing all events instances with ids:`);
   console.log(cancelledGoogleIds);
-  const deleteQuery = pgformat(
-    "DELETE FROM events WHERE google_id in (%L)",
-    cancelledGoogleIds
-  );
-  await pgClient.query(deleteQuery);
+  if (cancelledGoogleIds.length > 0) {
+    const deleteQuery = pgformat(
+      "DELETE FROM events WHERE google_id in (%L)",
+      cancelledGoogleIds
+    );
+    return pgClient.query(deleteQuery);
+  } else {
+    return Promise.resolve(0);
+  }
 }
 
 // just for testing
@@ -166,13 +174,37 @@ export async function handlePost(
   }
 }
 
-export async function handleDelete(req: Request, res: Response): Promise<void> {
-  // TODO:
-  // In the same transaction:
-  // 1. Delete all events with no existing associated submitted survey responses
-  // 2. Mark the recurring event as not tracked
-  // 3. Remove push notification subscription with Google API
-  res.status(404).json({ message: "TODO: IMPLEMENT ME Tracking stopped" });
+export async function handleDelete(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  const pool = req.pool;
+  const pgClient = await pool.connect();
+  try {
+    await pgClient.query("BEGIN");
+    pgClient.query(
+      "UPDATE recurring_events SET tracked = false WHERE google_id = $1",
+      [req.params.recurringEventId]
+    );
+
+    // This should eventually check if anything of value is pointing to it so
+    // that it's not removed accidentally or to prevent the query from failing
+    pgClient.query("DELETE FROM events WHERE recurring_event_google_id = $1", [
+      req.params.recurringEventId,
+    ]);
+
+    // TODO:
+    // 3. Remove push notification subscription with Google API
+    //
+    await pgClient.query("COMMIT");
+    res.status(200).json({ message: "Tracking stopped" });
+  } catch (e) {
+    await pgClient.query("ROLLBACK");
+    next(e);
+  } finally {
+    pgClient.release();
+  }
 }
 
 // TODO:
