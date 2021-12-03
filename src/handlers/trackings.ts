@@ -3,6 +3,7 @@ import { calendar_v3 } from "@googleapis/calendar";
 import pgformat from "pg-format";
 import { PoolClient } from "pg";
 import { UserEntity } from "../models/user";
+import { v4 as uuidv4 } from "uuid";
 
 async function upsertInstances(
   pgClient: PoolClient,
@@ -102,8 +103,6 @@ export async function handlePost(
   });
 
   try {
-    // console.log("Calling Google Calendar API");
-
     // this call is mostly only needed to get an authoritative summary name
     // assuming we can't trust instances to be representative of the true title
     const getResult = await calendarAPI.events.get({
@@ -162,7 +161,24 @@ export async function handlePost(
         listResult.data.items.filter((i) => i.status === "cancelled")
       );
 
-      // TODO: subscribe to Google's notifications for this recurring event
+      const watchParams: calendar_v3.Schema$Channel = {
+        id: uuidv4(),
+        type: "web_hook",
+        params: { ttl: "1800" },
+        address: "https://app.akurilin.com/notifications",
+      };
+
+      const watchRes = await calendarAPI.events.watch({
+        calendarId: "primary",
+        requestBody: watchParams,
+      });
+
+      // TODO: blow up on status 400
+      // test if it goes into the catch block on 400 anyway
+
+      console.log("RESULT OF WATCH");
+      console.log(watchRes);
+
       await pgClient.query("COMMIT");
       res.status(200).json({
         message: "Tracking initiated successfully",
@@ -225,14 +241,6 @@ export async function handleDelete(
     pgClient.release();
   }
 }
-
-// TODO:
-// This goes into another file
-// export async sunction handlePushNotificationPost(...) {
-// if message type is "exists" then check if you even have something with that
-// resource ID and if you do go ahead and
-// }
-//
 
 // This sync only does work for the next two weeks, everything else gets wiped
 // if it has no associated records in the system

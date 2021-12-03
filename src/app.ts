@@ -329,6 +329,14 @@ app.get(
   Trackings.handleSync
 );
 
+app.post("/notifications", (req, res) => {
+  console.log("NOTIFICATIONS REQ:");
+  // console.log(req);
+  console.log(req.rawHeaders);
+  console.log(req.body);
+  res.status(200).json({});
+});
+
 // TODO: consider turning this into a DELETE /sessions
 app.get("/auth/logout", ensureUserIsLoggedIn, (req, res) => {
   req.session.destroy(() => {
