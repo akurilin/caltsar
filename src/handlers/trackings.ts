@@ -139,8 +139,8 @@ export async function handlePost(
       await pgClient.query("BEGIN");
 
       await pgClient.query(
-        "INSERT INTO recurring_events (google_id, summary, tracked) VALUES ($1, $2, $3) ON CONFLICT (google_id) DO NOTHING",
-        [event.id, event.summary, true]
+        "INSERT INTO recurring_events (google_id, summary, tracked, organizer_google_id) VALUES ($1, $2, $3, $4) ON CONFLICT (google_id) DO NOTHING",
+        [event.id, event.summary, true, user.googleId]
       );
 
       if (!listResult.data) {

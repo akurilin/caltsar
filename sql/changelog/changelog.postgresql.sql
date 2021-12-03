@@ -52,4 +52,4 @@ CREATE TABLE events (
 );
 
 -- changeset alex:1638486671
-ALTER TABLE recurring_events ADD COLUMN organizer_id text REFERENCES users(google_id) NOT NULL;
+ALTER TABLE recurring_events ADD COLUMN organizer_google_id text REFERENCES users(google_id) NOT NULL;
