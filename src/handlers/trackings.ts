@@ -183,24 +183,41 @@ export async function handleDelete(
 ): Promise<void> {
   const pool = req.pool;
   const pgClient = await pool.connect();
+  const user = req.user as UserEntity;
   try {
     await pgClient.query("BEGIN");
-    pgClient.query(
-      "UPDATE recurring_events SET tracked = false WHERE google_id = $1",
+
+    const recEventRes = await pgClient.query(
+      "SELECT * FROM recurring_events WHERE google_id = $1",
       [req.params.recurringEventId]
     );
 
-    // This should eventually check if anything of value is pointing to it so
-    // that it's not removed accidentally or to prevent the query from failing
-    pgClient.query("DELETE FROM events WHERE recurring_event_google_id = $1", [
-      req.params.recurringEventId,
-    ]);
+    // make sure this deletion is authorized
+    if (
+      recEventRes.rows[0] &&
+      recEventRes.rows[0]["organizer_google_id"] === user.googleId
+    ) {
+      // for now intentionally not resetting the organizer_google_id back
+      await pgClient.query(
+        "UPDATE recurring_events SET tracked = false WHERE google_id = $1",
+        [req.params.recurringEventId]
+      );
 
-    // TODO:
-    // 3. Remove push notification subscription with Google API
-    //
-    await pgClient.query("COMMIT");
-    res.status(200).json({ message: "Tracking stopped" });
+      // This should eventually check if anything of value is pointing to it so
+      // that it's not removed accidentally or to prevent the query from failing
+      await pgClient.query(
+        "DELETE FROM events WHERE recurring_event_google_id = $1",
+        [req.params.recurringEventId]
+      );
+
+      // TODO:
+      // 3. Remove push notification subscription with Google API
+      //
+      await pgClient.query("COMMIT");
+      res.status(200).json({ message: "Tracking stopped" });
+    } else {
+      res.status(400).json({ message: "No permission" });
+    }
   } catch (e) {
     await pgClient.query("ROLLBACK");
     next(e);
