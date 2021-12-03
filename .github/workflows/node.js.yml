@@ -67,3 +67,4 @@ jobs:
           PGPORT: 5432
           COOKIE_SECRET: bad kitty
           FRONTEND_URI: http://localhost:3001
+      - run: find ./scripts/ -name "*.sh" -exec shellcheck -s sh {} \;

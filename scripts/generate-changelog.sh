@@ -5,7 +5,7 @@
 
 ROOT_FOLDER=/Users/alex/code/caltsar
 CHANGELOG_FOLDER=/sql/changelog
-CHANGELOG_FILE=changelog.postgresql.sql
+CHANGELOG_FILE=changelog2.postgresql.sql
 
 docker run --network=host --rm -v "$ROOT_FOLDER""$CHANGELOG_FOLDER":/liquibase/changelog \
   liquibase/liquibase \
@@ -14,6 +14,6 @@ docker run --network=host --rm -v "$ROOT_FOLDER""$CHANGELOG_FOLDER":/liquibase/c
   --password=password \
   generateChangeLog \
   --changeLogFile=/liquibase/changelog/"$CHANGELOG_FILE" && \
-npx sql-formatter -l postgresql -u < ."$CHANGELOG_FOLDER"/"$CHANGELOG_FILE" -o \
-  ."$CHANGELOG_FOLDER"/"$CHANGELOG_FILE" && \
+cp ."$CHANGELOG_FOLDER"/"$CHANGELOG_FILE" /tmp/"$CHANGELOG_FILE" && \
+npx sql-formatter -l postgresql -u < /tmp/"$CHANGELOG_FILE" -o ."$CHANGELOG_FOLDER"/"$CHANGELOG_FILE" && \
 cat ."$CHANGELOG_FOLDER"/"$CHANGELOG_FILE"
