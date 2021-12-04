@@ -164,35 +164,55 @@ export async function handlePost(
         listResult.data.items.filter((i) => i.status === "cancelled")
       );
 
-      // We end up with a unique UUID per recurring event tracked, but we will
-      // be sharing the same resource id for the calendar, which is always going
-      // to be "primary" in our case
-      const channelId = uuidv4();
-      const watchRes = await calendarAPI.events.watch({
-        calendarId: "primary",
-        requestBody: {
-          id: channelId,
-          type: "web_hook",
-          // set it to 1426325213000 once we're certain we don't need channels
-          // to expire quicky for debugging purposes
-          params: { ttl: "1800" },
-          address: "https://app.akurilin.com/notifications",
-        },
-      });
+      if (!user.pushNotificationChannelId && !user.pushNotificationResourceId) {
+        const ttlInSeconds = 1800;
+        const now = new Date();
 
-      if (watchRes.status != 200) {
-        // we want to force a rollback here by ending up in the catch block
-        console.log("RESULT OF WATCH API CALL");
-        console.log(watchRes);
-        throw new Error("The Google Calendar API events.watch() call failed");
+        // calculate when the push notification will expire so we can renew it
+        const watchingUntil = new Date(now.getTime() + 1000 * ttlInSeconds);
+
+        // We end up with a unique UUID per user (techically per primary
+        // calendar), but we will be sharing the same resource id for the
+        // calendar, which is always going to be "primary" in our case
+        const channelId = uuidv4();
+        const watchRes = await calendarAPI.events.watch({
+          calendarId: "primary",
+          requestBody: {
+            id: channelId,
+            type: "web_hook",
+            // set it to 1426325213000 once we're certain we don't need channels
+            // to expire quicky for debugging purposes
+            params: { ttl: ttlInSeconds.toString() },
+            address: "https://app.akurilin.com/notifications",
+          },
+        });
+
+        if (watchRes.status != 200) {
+          // we want to force a rollback here by ending up in the catch block
+          console.log("RESULT OF WATCH API CALL");
+          console.log(watchRes);
+          throw new Error("The Google Calendar API events.watch() call failed");
+        }
+
+        // await pgClient.query(
+        //   `UPDATE recurring_events
+        //    SET push_notification_channel_id = $1, push_notification_resource_id = $2
+        //    WHERE google_id = $3`,
+        //   [channelId, watchRes.data.resourceId, recurringEventId]
+        // );
+
+        // we need to watch the primary calendar only once
+        // the resourceId seems to relate to the primary calendar for whose
+        // events we're initializing watching, however this resource id is not
+        // visible anywhere in the API, so there's no way of retrieving it
+        // outside of making the .watch() call and storing it for later
+        await pgClient.query(
+          `UPDATE users
+           SET push_notification_channel_id = $1, push_notification_resource_id = $2, watching_until = $3
+           WHERE id = $4`,
+          [channelId, watchRes.data.resourceId, watchingUntil, user.id]
+        );
       }
-
-      await pgClient.query(
-        `UPDATE recurring_events
-         SET push_notification_channel_id = $1, push_notification_resource_id = $2
-         WHERE google_id = $3`,
-        [channelId, watchRes.data.resourceId, recurringEventId]
-      );
 
       await pgClient.query("COMMIT");
       res.status(200).json({
@@ -231,11 +251,21 @@ export async function handleDelete(
     const recEvent = recEventRes.rows.length > 0 ? recEventRes.rows[0] : null;
     if (recEvent && recEvent["organizer_google_id"] === user.googleId) {
       // for now intentionally not resetting the organizer_google_id back
+      //
+      // await pgClient.query(
+      //   `UPDATE recurring_events
+      //    SET tracked = false, push_notification_channel_id = NULL, push_notification_resource_id = NULL
+      //    WHERE google_id = $1`,
+      //   [req.params.recurringEventId]
+      // );
+      //
+      // TODO: this should only be run if there are no recurring events being
+      // tracked
       await pgClient.query(
-        `UPDATE recurring_events
-         SET tracked = false, push_notification_channel_id = NULL, push_notification_resource_id = NULL
-         WHERE google_id = $1`,
-        [req.params.recurringEventId]
+        `UPDATE users
+         SET push_notification_channel_id = NULL, push_notification_resource_id = NULL, watching_until = NULL
+         WHERE id = $1`,
+        [user.id]
       );
 
       // This should eventually check if anything of value is pointing to it so

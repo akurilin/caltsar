@@ -11,6 +11,8 @@ export interface User {
 
 export interface UserEntity extends User {
   id: number;
+  pushNotificationChannelId: string | null;
+  pushNotificationResourceId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +32,12 @@ function convertDBRowToEntity(row: any): UserEntity {
     email: row.email,
     accessToken: row.access_token,
     refreshToken: row.refresh_token,
+    pushNotificationChannelId: row.push_notification_channel_id
+      ? row.pushNotificationChannelId
+      : null,
+    pushNotificationResourceId: row.push_notification_resource_id
+      ? row.push_notification_resource_id
+      : null,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
