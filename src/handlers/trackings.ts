@@ -42,8 +42,8 @@ function deleteRecurring(
   instances: calendar_v3.Schema$Event[]
 ) {
   const cancelledGoogleIds = instances.map((item) => item.id);
-  console.log(`DELETE-ing all recurring_events with ids:`);
-  console.log(cancelledGoogleIds);
+  // console.log(`DELETE-ing all recurring_events with ids:`);
+  // console.log(cancelledGoogleIds);
   if (cancelledGoogleIds.length > 0) {
     const deleteQuery = pgformat(
       "DELETE FROM recurring_events WHERE google_id in (%L)",
@@ -60,8 +60,8 @@ function deleteInstances(
   instances: calendar_v3.Schema$Event[]
 ) {
   const cancelledGoogleIds = instances.map((item) => item.id);
-  console.log(`DELETE-ing all events instances with ids:`);
-  console.log(cancelledGoogleIds);
+  // console.log(`DELETE-ing all events instances with ids:`);
+  // console.log(cancelledGoogleIds);
   if (cancelledGoogleIds.length > 0) {
     const deleteQuery = pgformat(
       "DELETE FROM events WHERE google_id in (%L)",
@@ -141,7 +141,7 @@ export async function handlePost(
       await pgClient.query(
         `INSERT INTO recurring_events (google_id, summary, tracked, organizer_google_id)
          VALUES ($1, $2, $3, $4)
-         ON CONFLICT (google_id) DO NOTHING`,
+         ON CONFLICT (google_id) DO UPDATE SET tracked = true`,
         [event.id, event.summary, true, user.googleId]
       );
 
@@ -164,12 +164,17 @@ export async function handlePost(
         listResult.data.items.filter((i) => i.status === "cancelled")
       );
 
-      if (!user.pushNotificationChannelId && !user.pushNotificationResourceId) {
+      // either we didn't have push notifications enabled for this user or the
+      // push notification expired and the channel needs to be recreated
+      if (
+        (!user.pushNotificationChannelId && !user.pushNotificationResourceId) ||
+        (user.watchingUntil && user.watchingUntil < new Date())
+      ) {
         const ttlInSeconds = 1800;
         const now = new Date();
 
         // calculate when the push notification will expire so we can renew it
-        const watchingUntil = new Date(now.getTime() + 1000 * ttlInSeconds);
+        const newWatchingUntil = new Date(now.getTime() + 1000 * ttlInSeconds);
 
         // We end up with a unique UUID per user (techically per primary
         // calendar), but we will be sharing the same resource id for the
@@ -194,13 +199,6 @@ export async function handlePost(
           throw new Error("The Google Calendar API events.watch() call failed");
         }
 
-        // await pgClient.query(
-        //   `UPDATE recurring_events
-        //    SET push_notification_channel_id = $1, push_notification_resource_id = $2
-        //    WHERE google_id = $3`,
-        //   [channelId, watchRes.data.resourceId, recurringEventId]
-        // );
-
         // we need to watch the primary calendar only once
         // the resourceId seems to relate to the primary calendar for whose
         // events we're initializing watching, however this resource id is not
@@ -210,7 +208,7 @@ export async function handlePost(
           `UPDATE users
            SET push_notification_channel_id = $1, push_notification_resource_id = $2, watching_until = $3
            WHERE id = $4`,
-          [channelId, watchRes.data.resourceId, watchingUntil, user.id]
+          [channelId, watchRes.data.resourceId, newWatchingUntil, user.id]
         );
       }
 
@@ -251,39 +249,36 @@ export async function handleDelete(
     const recEvent = recEventRes.rows.length > 0 ? recEventRes.rows[0] : null;
     if (recEvent && recEvent["organizer_google_id"] === user.googleId) {
       // for now intentionally not resetting the organizer_google_id back
-      //
-      // await pgClient.query(
-      //   `UPDATE recurring_events
-      //    SET tracked = false, push_notification_channel_id = NULL, push_notification_resource_id = NULL
-      //    WHERE google_id = $1`,
-      //   [req.params.recurringEventId]
-      // );
-      //
-      // TODO: this should only be run if there are no recurring events being
-      // tracked
       await pgClient.query(
-        `UPDATE users
-         SET push_notification_channel_id = NULL, push_notification_resource_id = NULL, watching_until = NULL
-         WHERE id = $1`,
-        [user.id]
-      );
-
-      // This should eventually check if anything of value is pointing to it so
-      // that it's not removed accidentally or to prevent the query from failing
-      await pgClient.query(
-        "DELETE FROM events WHERE recurring_event_google_id = $1",
+        `UPDATE recurring_events SET tracked = false WHERE google_id = $1`,
         [req.params.recurringEventId]
       );
 
-      if (
-        recEvent["push_notification_channel_id"] &&
-        recEvent["push_notification_resource_id"]
-      ) {
+      const trackedRecurringEventsQuery = await pgClient.query(
+        `SELECT *
+         FROM recurring_events
+         WHERE organizer_google_id = $1 AND tracked = true`,
+        [user.googleId]
+      );
+
+      // console.log(trackedRecurringEventsQuery);
+
+      // if there are no more tracked recurring events, we want to go ahead and
+      // delete push notifications from the user and tell Google to stop sending
+      // them
+      if (trackedRecurringEventsQuery.rows.length === 0) {
+        await pgClient.query(
+          `UPDATE users
+          SET push_notification_channel_id = NULL, push_notification_resource_id = NULL, watching_until = NULL
+          WHERE id = $1`,
+          [user.id]
+        );
+
         try {
           await calendarAPI.channels.stop({
             requestBody: {
-              id: recEvent["push_notification_channel_id"],
-              resourceId: recEvent["push_notification_resource_id"],
+              id: user.pushNotificationChannelId,
+              resourceId: user.pushNotificationResourceId,
             },
           });
         } catch (stopError) {
@@ -298,6 +293,13 @@ export async function handleDelete(
           }
         }
       }
+
+      // This should eventually check if anything of value is pointing to it so
+      // that it's not removed accidentally or to prevent the query from failing
+      await pgClient.query(
+        "DELETE FROM events WHERE recurring_event_google_id = $1",
+        [req.params.recurringEventId]
+      );
 
       await pgClient.query("COMMIT");
       res.status(200).json({ message: "Tracking stopped" });

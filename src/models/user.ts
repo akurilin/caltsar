@@ -13,6 +13,7 @@ export interface UserEntity extends User {
   id: number;
   pushNotificationChannelId: string | null;
   pushNotificationResourceId: string | null;
+  watchingUntil: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,11 +34,12 @@ function convertDBRowToEntity(row: any): UserEntity {
     accessToken: row.access_token,
     refreshToken: row.refresh_token,
     pushNotificationChannelId: row.push_notification_channel_id
-      ? row.pushNotificationChannelId
+      ? row.push_notification_channel_id
       : null,
     pushNotificationResourceId: row.push_notification_resource_id
       ? row.push_notification_resource_id
       : null,
+    watchingUntil: row.watching_until ? new Date(row.watching_until) : null,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };

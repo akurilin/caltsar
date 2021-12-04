@@ -5,11 +5,9 @@ export async function handlePost(
   res: Response
   // next: NextFunction
 ): Promise<void> {
-  console.log("NOTIFICATIONS REQ:");
-  // console.log(req);
-  // console.log(req.rawHeaders);
-  console.log(req.headers);
-  console.log(req.body);
+  // console.log("NOTIFICATIONS REQ:");
+  // console.log(req.headers);
+  // console.log(req.body);
 
   // x-goog-resource-state
   // if sync = nothing to do here
