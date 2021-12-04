@@ -4,6 +4,7 @@ import pgformat from "pg-format";
 import { PoolClient } from "pg";
 import { UserEntity } from "../models/user";
 import { v4 as uuidv4 } from "uuid";
+import { GaxiosError } from "gaxios";
 
 async function upsertInstances(
   pgClient: PoolClient,
@@ -23,8 +24,8 @@ async function upsertInstances(
       ];
     });
 
-  console.log(`Upserting event instances:`);
-  values.forEach((v) => console.log(v));
+  // console.log(`Upserting event instances:`);
+  // values.forEach((v) => console.log(v));
 
   const insertEventsQuery = pgformat(
     "INSERT INTO events (google_id, recurring_event_google_id, end_date_time, time_zone) VALUES %L ON CONFLICT (google_id) DO UPDATE SET end_date_time = EXCLUDED.end_date_time, time_zone = EXCLUDED.time_zone",
@@ -138,7 +139,9 @@ export async function handlePost(
       await pgClient.query("BEGIN");
 
       await pgClient.query(
-        "INSERT INTO recurring_events (google_id, summary, tracked, organizer_google_id) VALUES ($1, $2, $3, $4) ON CONFLICT (google_id) DO NOTHING",
+        `INSERT INTO recurring_events (google_id, summary, tracked, organizer_google_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (google_id) DO NOTHING`,
         [event.id, event.summary, true, user.googleId]
       );
 
@@ -161,23 +164,35 @@ export async function handlePost(
         listResult.data.items.filter((i) => i.status === "cancelled")
       );
 
-      const watchParams: calendar_v3.Schema$Channel = {
-        id: uuidv4(),
-        type: "web_hook",
-        params: { ttl: "1800" },
-        address: "https://app.akurilin.com/notifications",
-      };
-
+      // We end up with a unique UUID per recurring event tracked, but we will
+      // be sharing the same resource id for the calendar, which is always going
+      // to be "primary" in our case
+      const channelId = uuidv4();
       const watchRes = await calendarAPI.events.watch({
         calendarId: "primary",
-        requestBody: watchParams,
+        requestBody: {
+          id: channelId,
+          type: "web_hook",
+          // set it to 1426325213000 once we're certain we don't need channels
+          // to expire quicky for debugging purposes
+          params: { ttl: "1800" },
+          address: "https://app.akurilin.com/notifications",
+        },
       });
 
-      // TODO: blow up on status 400
-      // test if it goes into the catch block on 400 anyway
+      if (watchRes.status != 200) {
+        // we want to force a rollback here by ending up in the catch block
+        console.log("RESULT OF WATCH API CALL");
+        console.log(watchRes);
+        throw new Error("The Google Calendar API events.watch() call failed");
+      }
 
-      console.log("RESULT OF WATCH");
-      console.log(watchRes);
+      await pgClient.query(
+        `UPDATE recurring_events
+         SET push_notification_channel_id = $1, push_notification_resource_id = $2
+         WHERE google_id = $3`,
+        [channelId, watchRes.data.resourceId, recurringEventId]
+      );
 
       await pgClient.query("COMMIT");
       res.status(200).json({
@@ -200,6 +215,10 @@ export async function handleDelete(
   const pool = req.pool;
   const pgClient = await pool.connect();
   const user = req.user as UserEntity;
+  const googleClient = req.googleClient;
+  const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
+    auth: googleClient,
+  });
   try {
     await pgClient.query("BEGIN");
 
@@ -209,13 +228,13 @@ export async function handleDelete(
     );
 
     // make sure this deletion is authorized
-    if (
-      recEventRes.rows[0] &&
-      recEventRes.rows[0]["organizer_google_id"] === user.googleId
-    ) {
+    const recEvent = recEventRes.rows.length > 0 ? recEventRes.rows[0] : null;
+    if (recEvent && recEvent["organizer_google_id"] === user.googleId) {
       // for now intentionally not resetting the organizer_google_id back
       await pgClient.query(
-        "UPDATE recurring_events SET tracked = false WHERE google_id = $1",
+        `UPDATE recurring_events
+         SET tracked = false, push_notification_channel_id = NULL, push_notification_resource_id = NULL
+         WHERE google_id = $1`,
         [req.params.recurringEventId]
       );
 
@@ -226,9 +245,30 @@ export async function handleDelete(
         [req.params.recurringEventId]
       );
 
-      // TODO:
-      // 3. Remove push notification subscription with Google API
-      //
+      if (
+        recEvent["push_notification_channel_id"] &&
+        recEvent["push_notification_resource_id"]
+      ) {
+        try {
+          await calendarAPI.channels.stop({
+            requestBody: {
+              id: recEvent["push_notification_channel_id"],
+              resourceId: recEvent["push_notification_resource_id"],
+            },
+          });
+        } catch (stopError) {
+          const err = stopError as GaxiosError;
+          // it's possible this watching subscription is already dead, so
+          // there's nothing for us to stop watching, and we can proceed with
+          // the happy path
+          if (err.code != "404") {
+            throw stopError;
+          } else {
+            console.log("Gaxios resulted in a 404, but that's ok");
+          }
+        }
+      }
+
       await pgClient.query("COMMIT");
       res.status(200).json({ message: "Tracking stopped" });
     } else {

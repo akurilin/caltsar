@@ -13,5 +13,4 @@ docker run --network=host --rm -v "$ROOT_FOLDER""$CHANGELOG_FOLDER":/liquibase/c
   --username=postgres \
   --password=password \
   --changeLogFile="$CHANGELOG_FILE" \
-  update
-  # rollbackCount 1
+  rollbackCount 1

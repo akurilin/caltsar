@@ -22,6 +22,7 @@ import {
 import { getCurrentUser } from "./handlers/userhandler";
 import * as Events from "./handlers/events";
 import * as Trackings from "./handlers/trackings";
+import * as Notifications from "./handlers/notifications";
 
 // declaration merging
 declare global {
@@ -329,13 +330,7 @@ app.get(
   Trackings.handleSync
 );
 
-app.post("/notifications", (req, res) => {
-  console.log("NOTIFICATIONS REQ:");
-  // console.log(req);
-  console.log(req.rawHeaders);
-  console.log(req.body);
-  res.status(200).json({});
-});
+app.post("/notifications", Notifications.handlePost);
 
 // TODO: consider turning this into a DELETE /sessions
 app.get("/auth/logout", ensureUserIsLoggedIn, (req, res) => {

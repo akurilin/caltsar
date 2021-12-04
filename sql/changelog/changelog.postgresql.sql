@@ -53,3 +53,9 @@ CREATE TABLE events (
 
 -- changeset alex:1638486671
 ALTER TABLE recurring_events ADD COLUMN organizer_google_id text REFERENCES users(google_id) NOT NULL;
+
+-- changeset alex:1638486672
+ALTER TABLE recurring_events ADD COLUMN push_notification_channel_id text UNIQUE;
+ALTER TABLE recurring_events ADD COLUMN push_notification_resource_id text;
+-- rollback ALTER TABLE recurring_events DROP COLUMN push_notification_channel_id;
+-- rollback ALTER TABLE recurring_events DROP COLUMN push_notification_resource_id;
