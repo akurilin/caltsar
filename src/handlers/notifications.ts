@@ -5,8 +5,10 @@ export async function handlePost(
   res: Response
   // next: NextFunction
 ): Promise<void> {
-  // console.log("NOTIFICATIONS REQ:");
-  // console.log(req.headers);
+  // TODO: let's just implement a hard sync here for now and optimize only way
+  // the hell later
+  console.log("NOTIFICATIONS REQ:");
+  console.log(req.headers);
   // console.log(req.body);
 
   // x-goog-resource-state

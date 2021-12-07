@@ -302,12 +302,6 @@ app.get(
   Events.handleGet
 );
 
-app.get(
-  "/trackings",
-  ensureUserIsLoggedIn,
-  injectDBPool(pool),
-  Trackings.handleGet
-);
 app.post(
   "/trackings/:recurringEventId",
   ensureUserIsLoggedIn,
