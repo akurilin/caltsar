@@ -1,5 +1,6 @@
 import { calendar_v3 } from "@googleapis/calendar";
 import { Request, Response, NextFunction } from "express";
+import { UserEntity } from "../models/user";
 // import { OAuth2Client } from "googleapis-common";
 // import { GaxiosError } from "gaxios";
 
@@ -91,14 +92,14 @@ export async function handleGet(
   const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
     auth: googleClient,
   });
+  const user = req.user as UserEntity;
 
   try {
     const pool = req.pool;
 
-    // TODO: filter by user
     const dbRecurringEvents = await pool.query(
-      "SELECT * FROM recurring_events",
-      []
+      "SELECT * FROM recurring_events WHERE organizer_google_id = $1",
+      [user.googleId]
     );
 
     const events = await calendarAPI.events.list({

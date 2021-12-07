@@ -258,41 +258,7 @@ app.get(
   })
 );
 
-// 2x test routes to test authentication
-// app.get("/authenticated", ensureUserIsLoggedIn, (req, res) => {
-//   console.log(req.user);
-//   return res.status(200).json({ message: "YES, you are authenticated" });
-// });
-
-// app.get("/unauthenticated", (req, res) => {
-//   if (!req.user) {
-//     return res.status(200).json({ message: "YES, you are unauthenticated" });
-//   } else {
-//     return res.status(200).json({ message: "NO, you are not unauthenticated" });
-//   }
-// });
-
 app.get("/users/me", ensureUserIsLoggedIn, getCurrentUser);
-
-// app.get("/events", ensureUserIsLoggedIn, (req, res, next) => {
-//   const thisUser = req.user as user.UserEntity;
-
-//   if (!thisUser.refreshToken || !thisUser.accessToken) {
-//     return res.status(500).json({
-//       message:
-//         "ERROR: looks like we didn't have Google client credentials for you",
-//     });
-//   } else {
-//     const client = upsertGoogleAPIClient(
-//       pool,
-//       googleAPIClients,
-//       thisUser.id,
-//       thisUser.accessToken,
-//       thisUser.refreshToken
-//     );
-//     Events.handleGet(client)(req, res, next);
-//   }
-// });
 
 app.get(
   "/events",

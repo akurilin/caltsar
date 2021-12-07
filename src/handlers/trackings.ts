@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { calendar_v3 } from "@googleapis/calendar";
 import pgformat from "pg-format";
-import { PoolClient } from "pg";
 import { UserEntity } from "../models/user";
 import { v4 as uuidv4 } from "uuid";
 import { GaxiosError } from "gaxios";
@@ -73,6 +72,35 @@ import dayjs from "dayjs";
 //     return Promise.resolve(0);
 //   }
 // }
+
+// call Events.List and paginate the results if they exceed maxResults
+async function paginateList(
+  options: calendar_v3.Params$Resource$Events$List,
+  calendarAPI: calendar_v3.Calendar
+): Promise<calendar_v3.Schema$Event[]> {
+  let events: calendar_v3.Schema$Event[] = [];
+  let eventsRes = null;
+
+  do {
+    let nextPageToken = undefined;
+    if (eventsRes && eventsRes.data.nextPageToken) {
+      nextPageToken = eventsRes.data.nextPageToken;
+    } else {
+      nextPageToken = undefined;
+    }
+
+    // retrieve all instances that we'll want to re-add to the
+    console.log(`Calling events.list with pageToken ${nextPageToken}`);
+    options.pageToken = nextPageToken;
+    eventsRes = await calendarAPI.events.list(options);
+
+    if (eventsRes.data.items) {
+      events = events.concat(eventsRes.data.items);
+    }
+  } while (eventsRes.data.nextPageToken);
+
+  return events;
+}
 
 export async function handlePost(
   req: Request,
@@ -278,46 +306,45 @@ export async function handleSync(
   const from = beginningOfMonth.subtract(1, "second").toISOString();
   const to = beginningOfMonth.add(2, "month").toISOString();
 
-  console.log(from);
-  console.log(to);
+  // console.log(from);
+  // console.log(to);
 
   try {
-    // TODO: recall that both these API can end up being paginated
+    const allRecurringEvents = await paginateList(
+      {
+        calendarId: "primary",
+        singleEvents: false,
+        showDeleted: true,
+        timeMin: from,
+        timeMax: to,
+        maxResults: 2500,
+        pageToken: undefined,
+      },
+      calendarAPI
+    );
 
-    // retrieve recurring events including deleted ones
-    const allRecurringEventsRes = await calendarAPI.events.list({
-      calendarId: "primary",
-      singleEvents: false,
-      showDeleted: true,
-      timeMin: from,
-      timeMax: to,
-    });
+    const allActiveInstances = await paginateList(
+      {
+        calendarId: "primary",
+        singleEvents: true,
+        showDeleted: false,
+        timeMin: from,
+        timeMax: to,
+        maxResults: 2500,
+        pageToken: undefined,
+      },
+      calendarAPI
+    );
 
-    // retrieve all instances that we'll want to re-add to the
-    const activeInstancesRes = await calendarAPI.events.list({
-      calendarId: "primary",
-      singleEvents: true,
-      showDeleted: false,
-      timeMin: from,
-      timeMax: to,
-    });
-
-    const activeRecurring =
-      allRecurringEventsRes.data && allRecurringEventsRes.data.items
-        ? allRecurringEventsRes.data.items.filter(
-            (i) => i.status != "cancelled" && i.recurrence
-          )
-        : [];
-    const cancelledRecurring =
-      allRecurringEventsRes.data && allRecurringEventsRes.data.items
-        ? allRecurringEventsRes.data.items.filter(
-            (i) => i.status == "cancelled" && i.recurrence
-          )
-        : [];
-    const activeInstances =
-      activeInstancesRes.data && activeInstancesRes.data.items
-        ? activeInstancesRes.data.items.filter((i) => i.recurringEventId)
-        : [];
+    const activeRecurring = allRecurringEvents.filter(
+      (i) => i.status != "cancelled" && i.recurrence
+    );
+    const cancelledRecurring = allRecurringEvents.filter(
+      (i) => i.status == "cancelled" && i.recurrence
+    );
+    const activeInstances = allActiveInstances.filter(
+      (i) => i.recurringEventId
+    );
 
     await pgClient.query("BEGIN");
 
