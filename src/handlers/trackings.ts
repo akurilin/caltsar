@@ -1,14 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import { calendar_v3 } from "@googleapis/calendar";
-// import pgformat from "pg-format";
 import { UserEntity } from "../models/user";
 import { v4 as uuidv4 } from "uuid";
 import { GaxiosError } from "gaxios";
-// import dayjs from "dayjs";
 import { runSync } from "../models/sync";
 
 // async function upsertInstances(
-//   pgClient: PoolClient,
+//   poolClient: PoolClient,
 //   instances: calendar_v3.Schema$Event[]
 // ) {
 //   const values = instances
@@ -32,14 +30,14 @@ import { runSync } from "../models/sync";
 //     "INSERT INTO events (google_id, recurring_event_google_id, end_date_time, time_zone) VALUES %L ON CONFLICT (google_id) DO UPDATE SET end_date_time = EXCLUDED.end_date_time, time_zone = EXCLUDED.time_zone",
 //     values
 //   );
-//   await pgClient.query(insertEventsQuery);
+//   await poolClient.query(insertEventsQuery);
 // }
 
 // NB: this is likely the wrong response if the user has already some
 //     data associated here unless they explicitly want to delete all of the
 //     data and don't care about preserving history
 // function deleteRecurring(
-//   pgClient: PoolClient,
+//   poolClient: PoolClient,
 //   instances: calendar_v3.Schema$Event[]
 // ) {
 //   const cancelledGoogleIds = instances.map((item) => item.id);
@@ -50,14 +48,14 @@ import { runSync } from "../models/sync";
 //       "DELETE FROM recurring_events WHERE google_id in (%L)",
 //       cancelledGoogleIds
 //     );
-//     return pgClient.query(deleteQuery);
+//     return poolClient.query(deleteQuery);
 //   } else {
 //     return Promise.resolve(0);
 //   }
 // }
 
 // function deleteInstances(
-//   pgClient: PoolClient,
+//   poolClient: PoolClient,
 //   instances: calendar_v3.Schema$Event[]
 // ) {
 //   const cancelledGoogleIds = instances.map((item) => item.id);
@@ -68,7 +66,7 @@ import { runSync } from "../models/sync";
 //       "DELETE FROM events WHERE google_id in (%L)",
 //       cancelledGoogleIds
 //     );
-//     return pgClient.query(deleteQuery);
+//     return poolClient.query(deleteQuery);
 //   } else {
 //     return Promise.resolve(0);
 //   }
@@ -81,7 +79,7 @@ export async function handlePost(
 ): Promise<void> {
   const user = req.user as UserEntity;
   const pool = req.pool;
-  const pgClient = await pool.connect();
+  const poolClient = await pool.connect();
   const googleClient = req.googleClient;
   const recurringEventId = req.params.recurringEventId;
   const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
@@ -106,9 +104,9 @@ export async function handlePost(
     } else if (event.status === "cancelled") {
       res.status(400).json({ message: "You cannot track a cancelled event" });
     } else {
-      await pgClient.query("BEGIN");
+      await poolClient.query("BEGIN");
 
-      await pgClient.query(
+      await poolClient.query(
         `UPDATE recurring_events
          SET tracked = true
          WHERE google_id = $1 AND organizer_google_id = $2`,
@@ -155,7 +153,7 @@ export async function handlePost(
         // events we're initializing watching, however this resource id is not
         // visible anywhere in the API, so there's no way of retrieving it
         // outside of making the .watch() call and storing it for later
-        await pgClient.query(
+        await poolClient.query(
           `UPDATE users
            SET push_notification_channel_id = $1, push_notification_resource_id = $2, watching_until = $3
            WHERE id = $4`,
@@ -163,16 +161,16 @@ export async function handlePost(
         );
       }
 
-      await pgClient.query("COMMIT");
+      await poolClient.query("COMMIT");
       res.status(200).json({
         message: "Tracking initiated successfully",
       });
     }
   } catch (e) {
-    await pgClient.query("ROLLBACK");
+    await poolClient.query("ROLLBACK");
     next(e);
   } finally {
-    pgClient.release();
+    poolClient.release();
   }
 }
 
@@ -182,7 +180,7 @@ export async function handleDelete(
   next: NextFunction
 ): Promise<void> {
   const pool = req.pool;
-  const pgClient = await pool.connect();
+  const poolClient = await pool.connect();
   const user = req.user as UserEntity;
   const googleClient = req.googleClient;
   const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
@@ -190,11 +188,11 @@ export async function handleDelete(
   });
   const recurringEventId = req.params.recurringEventId;
   try {
-    await pgClient.query("BEGIN");
+    await poolClient.query("BEGIN");
 
     // this doesn't throw a 400 when unauthorized, it succeeds silently which
     // maybe somewhat unintuitive all things considered
-    await pgClient.query(
+    await poolClient.query(
       `UPDATE recurring_events
       SET tracked = false
       WHERE google_id = $1 AND organizer_google_id = $2`,
@@ -202,7 +200,7 @@ export async function handleDelete(
     );
 
     // could be optimized with just a count
-    const trackedRecurringEventsQuery = await pgClient.query(
+    const trackedRecurringEventsQuery = await poolClient.query(
       `SELECT *
       FROM recurring_events
       WHERE organizer_google_id = $1 AND tracked = true`,
@@ -213,7 +211,7 @@ export async function handleDelete(
     // delete push notifications from the user and tell Google to stop sending
     // them
     if (trackedRecurringEventsQuery.rows.length === 0) {
-      await pgClient.query(
+      await poolClient.query(
         `UPDATE users
         SET push_notification_channel_id = NULL, push_notification_resource_id = NULL, watching_until = NULL
         WHERE id = $1`,
@@ -240,13 +238,13 @@ export async function handleDelete(
       }
     }
 
-    await pgClient.query("COMMIT");
+    await poolClient.query("COMMIT");
     res.status(200).json({ message: "Tracking stopped" });
   } catch (e) {
-    await pgClient.query("ROLLBACK");
+    await poolClient.query("ROLLBACK");
     next(e);
   } finally {
-    pgClient.release();
+    poolClient.release();
   }
 }
 
@@ -258,7 +256,7 @@ export async function handleSync(
   next: NextFunction
 ): Promise<void> {
   const pool = req.pool;
-  const pgClient = await pool.connect();
+  const poolClient = await pool.connect();
   const googleClient = req.googleClient;
   const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
     auth: googleClient,
@@ -266,17 +264,17 @@ export async function handleSync(
   const user = req.user as UserEntity;
 
   try {
-    await pgClient.query("BEGIN");
+    await poolClient.query("BEGIN");
 
     // this is the meat
-    await runSync(calendarAPI, pgClient, user);
+    await runSync(calendarAPI, poolClient, user);
 
-    await pgClient.query("COMMIT");
+    await poolClient.query("COMMIT");
     res.status(200).json({ message: "Completed full resync of events" });
   } catch (e) {
-    await pgClient.query("ROLLBACK");
+    await poolClient.query("ROLLBACK");
     next(e);
   } finally {
-    pgClient.release();
+    poolClient.release();
   }
 }
