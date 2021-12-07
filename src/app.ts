@@ -41,6 +41,8 @@ declare global {
   }
 }
 
+// TODO: this feels like an unnecessary optimization, we could be creating a new
+// client on the fly on every request and scale just fine pretty much forever
 // initialize this to be empty
 const googleAPIClients: idToClient = {};
 
@@ -290,7 +292,10 @@ app.get(
   Trackings.handleSync
 );
 
-app.post("/notifications", Notifications.handlePost);
+// NB: this will not have the standard cookie we expect authenticated users to
+// call us with. This is an unauthed webhook call from Google with all of the
+// information being stored in the headers
+app.post("/notifications", injectDBPool(pool), Notifications.handlePost);
 
 // TODO: consider turning this into a DELETE /sessions
 app.get("/auth/logout", ensureUserIsLoggedIn, (req, res) => {

@@ -24,7 +24,7 @@ export type CallbackFunction = (
 ) => void;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function convertDBRowToEntity(row: any): UserEntity {
+export function convertDBRowToEntity(row: any): UserEntity {
   return {
     id: parseInt(row.id, 10),
     googleId: row.google_id,
