@@ -19,7 +19,7 @@ import {
   injectDBPool,
   injectGoogleClient,
 } from "./middleware";
-import { getCurrentUser } from "./handlers/userhandler";
+import * as UserHandler from "./handlers/userhandler";
 import * as Events from "./handlers/events";
 import * as Trackings from "./handlers/trackings";
 import * as Notifications from "./handlers/notifications";
@@ -260,7 +260,13 @@ app.get(
   })
 );
 
-app.get("/users/me", ensureUserIsLoggedIn, getCurrentUser);
+app.get("/users/me", ensureUserIsLoggedIn, UserHandler.getSelfUser);
+app.delete(
+  "/users/me",
+  ensureUserIsLoggedIn,
+  injectDBPool(pool),
+  UserHandler.deleteSelfUser
+);
 
 app.get(
   "/events",
@@ -284,6 +290,8 @@ app.delete(
   injectGoogleClient(googleAPIClients),
   Trackings.handleDelete
 );
+
+// make this a POST maybe?
 app.get(
   "/sync",
   ensureUserIsLoggedIn,

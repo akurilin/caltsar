@@ -179,3 +179,15 @@ export async function fetchByPushNotification(
     return null;
   }
 }
+
+export async function deleteByGoogleId(
+  poolClient: PoolClient,
+  googleId: string
+): Promise<void> {
+  await poolClient.query(
+    `DELETE
+     FROM users
+     WHERE google_id = $1`,
+    [googleId]
+  );
+}
