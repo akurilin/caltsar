@@ -33,6 +33,8 @@ async function paginateList(
   return events;
 }
 
+// I sense this function call can get pretty taxing both on memory and on the
+// database for a sufficiently old and beefy calendar
 // assumes a transaction was already started by the caller of this fn
 export async function runSync(
   calendarAPI: calendar_v3.Calendar,
@@ -90,10 +92,12 @@ export async function runSync(
   );
   const activeInstances = allActiveInstances.filter((i) => i.recurringEventId);
 
+  // NB: we're blowing away all of the events corresponding to all of the
+  // recurring events in the selected time period
   await poolClient.query(
     pgformat(
       "DELETE FROM events WHERE recurring_event_google_id IN (%L)",
-      cancelledRecurring.map((e) => e.id)
+      allRecurringEvents.map((e) => e.id)
     )
   );
 

@@ -265,114 +265,12 @@ export async function handleSync(
   });
   const user = req.user as UserEntity;
 
-  // // NB this will all be done in server time (likely UTC), but at some point
-  // // we'll want to do this with respect to the local time of the calendar we're
-  // // working with
-  // const now = dayjs();
-  // const beginningOfMonth = now
-  //   .date(1)
-  //   .hour(0)
-  //   .minute(0)
-  //   .second(0)
-  //   .millisecond(0);
-  // const from = beginningOfMonth.subtract(1, "second").toISOString();
-  // const to = beginningOfMonth.add(2, "month").toISOString();
-
-  // // console.log(from);
-  // // console.log(to);
-
-  // try {
-  //   const allRecurringEvents = await paginateList(
-  //     {
-  //       calendarId: "primary",
-  //       singleEvents: false,
-  //       showDeleted: true,
-  //       timeMin: from,
-  //       timeMax: to,
-  //       maxResults: 2500,
-  //       pageToken: undefined,
-  //     },
-  //     calendarAPI
-  //   );
-
-  //   const allActiveInstances = await paginateList(
-  //     {
-  //       calendarId: "primary",
-  //       singleEvents: true,
-  //       showDeleted: false,
-  //       timeMin: from,
-  //       timeMax: to,
-  //       maxResults: 2500,
-  //       pageToken: undefined,
-  //     },
-  //     calendarAPI
-  //   );
-
-  //   const activeRecurring = allRecurringEvents.filter(
-  //     (i) => i.status != "cancelled" && i.recurrence
-  //   );
-  //   const cancelledRecurring = allRecurringEvents.filter(
-  //     (i) => i.status == "cancelled" && i.recurrence
-  //   );
-  //   const activeInstances = allActiveInstances.filter(
-  //     (i) => i.recurringEventId
-  //   );
-
-  //   await pgClient.query("BEGIN");
-
-  //   await pgClient.query(
-  //     pgformat(
-  //       "DELETE FROM events WHERE recurring_event_google_id IN (%L)",
-  //       cancelledRecurring.map((e) => e.id)
-  //     )
-  //   );
-
-  //   await pgClient.query(
-  //     pgformat(
-  //       "DELETE FROM recurring_events WHERE google_id IN (%L)",
-  //       cancelledRecurring.map((e) => e.id)
-  //     )
-  //   );
-
-  //   // we will attempt to insert remaining active recurring events a second time
-  //   // and ignore the confict when it happens
-  //   const insertRecurringEventsQuery = pgformat(
-  //     `INSERT INTO recurring_events (google_id, summary, tracked, organizer_google_id) VALUES %L ON CONFLICT (google_id) DO UPDATE SET summary = EXCLUDED.summary`,
-  //     activeRecurring.map((e) => [e.id, e.summary, false, user.googleId])
-  //   );
-  //   // console.log(insertRecurringEventsQuery);
-  //   await pgClient.query(insertRecurringEventsQuery);
-
-  //   const instancesValues = activeInstances.map((item) => {
-  //     if (!item.end || !item.end.dateTime || !item.end.timeZone) {
-  //       throw new Error("The event is missing end time properties");
-  //     }
-  //     return [
-  //       item.id,
-  //       item.recurringEventId,
-  //       new Date(item.end.dateTime),
-  //       item.end.timeZone,
-  //     ];
-  //   });
-  //   const insertInstancesQuery = pgformat(
-  //     `INSERT INTO events (google_id, recurring_event_google_id, end_date_time, time_zone)
-  //     VALUES %L
-  //     ON CONFLICT (google_id) DO UPDATE SET end_date_time = EXCLUDED.end_date_time, time_zone = EXCLUDED.time_zone`,
-  //     instancesValues
-  //   );
-  //   await pgClient.query(insertInstancesQuery);
-
-  //   await pgClient.query("COMMIT");
-  //   res.status(200).json({ message: "Completed full resync of events" });
-  // } catch (e) {
-  //   await pgClient.query("ROLLBACK");
-  //   next(e);
-  // } finally {
-  //   pgClient.release();
-  // }
   try {
     await pgClient.query("BEGIN");
+
+    // this is the meat
     await runSync(calendarAPI, pgClient, user);
+
     await pgClient.query("COMMIT");
     res.status(200).json({ message: "Completed full resync of events" });
   } catch (e) {

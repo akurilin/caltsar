@@ -295,6 +295,9 @@ app.get(
 // NB: this will not have the standard cookie we expect authenticated users to
 // call us with. This is an unauthed webhook call from Google with all of the
 // information being stored in the headers
+// Because this is an unauthed route, we have to be careful as far as what we
+// let the caller do with this operation, since we currently don't have a way to
+// prevent non-Google from calling into this
 app.post("/notifications", injectDBPool(pool), Notifications.handlePost);
 
 // TODO: consider turning this into a DELETE /sessions

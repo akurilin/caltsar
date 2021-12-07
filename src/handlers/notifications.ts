@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { convertDBRowToEntity } from "../models/user";
+import { fetchByPushNotification } from "../models/user";
 import { generateNewAPIClient } from "../googleapiclients";
 import { calendar_v3 } from "@googleapis/calendar";
 import { runSync } from "../models/sync";
@@ -11,7 +11,7 @@ interface PushNotification {
   resourceURI: string;
 }
 
-// Probably unsafe
+// TODO: Unsafe since we're doing no validation around this
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function headersToPushNotification(headers: any): PushNotification {
   return {
@@ -27,26 +27,26 @@ export async function handlePost(
   res: Response,
   next: NextFunction
 ): Promise<void> {
+  // console.log("NOTIFICATIONS REQ:");
+  // console.log(req.headers);
   const pool = req.pool;
   const pgClient = await pool.connect();
-
-  console.log("NOTIFICATIONS REQ:");
-  console.log(req.headers);
-
   const pushNotification = headersToPushNotification(req.headers);
-  if (pushNotification.resourceState == "exists") {
+
+  if (pushNotification.resourceState == "sync") {
+    // NOOP
+    res.status(200).json({});
+  } else if (pushNotification.resourceState == "exists") {
     try {
       await pgClient.query("BEGIN");
 
-      const userQuery = await pgClient.query(
-        `SELECT *
-         FROM users
-         WHERE push_notification_channel_id = $1 AND push_notification_resource_id = $2`,
-        [pushNotification.channelId, pushNotification.resourceId]
+      const user = await fetchByPushNotification(
+        pgClient,
+        pushNotification.channelId,
+        pushNotification.resourceId
       );
 
-      if (userQuery.rows.length === 1) {
-        const user = convertDBRowToEntity(userQuery.rows[0]);
+      if (user) {
         const googleAPIClient = generateNewAPIClient(
           pool,
           user.id,
@@ -56,11 +56,15 @@ export async function handlePost(
         const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
           auth: googleAPIClient,
         });
+
+        // the meat of the execution
         await runSync(calendarAPI, pgClient, user);
+
         await pgClient.query("COMMIT");
         res.status(200).json({});
       } else {
-        // TODO: I don't really love all this branching, can we linearize this?
+        // I don't really love all this branching, can we linearize this?
+        // It's not unsustainable for now, but it's already hard to reason about
         await pgClient.query("ROLLBACK");
         res.status(400).json({
           message: `No user found for channel ${pushNotification.channelId}`,
@@ -73,11 +77,12 @@ export async function handlePost(
       pgClient.release();
     }
   } else {
-    // sync message, nothing for us to do here
-    res.status(200).json({});
+    next(Error("Not expecting a different resource state type"));
   }
 }
 
+// Sample req.headers
+//
 // {
 //   host: 'app.akurilin.com',
 //   'user-agent': 'APIs-Google; (+https://developers.google.com/webmasters/APIs-Google.html)',

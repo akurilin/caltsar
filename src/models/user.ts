@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, PoolClient } from "pg";
 
 export interface User {
   googleId: string;
@@ -24,7 +24,7 @@ export type CallbackFunction = (
 ) => void;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export function convertDBRowToEntity(row: any): UserEntity {
+function convertDBRowToEntity(row: any): UserEntity {
   return {
     id: parseInt(row.id, 10),
     googleId: row.google_id,
@@ -156,4 +156,26 @@ export function findById(
       callback(null, null);
     }
   });
+}
+
+export async function fetchByPushNotification(
+  poolClient: PoolClient,
+  channelId: string,
+  resourceId: string
+): Promise<UserEntity | null> {
+  const userQuery = await poolClient.query(
+    `SELECT *
+     FROM users
+     WHERE push_notification_channel_id = $1 AND push_notification_resource_id = $2`,
+    [channelId, resourceId]
+  );
+  if (userQuery.rows.length == 1) {
+    return convertDBRowToEntity(userQuery.rows[0]);
+  } else if (userQuery.rows.length > 1) {
+    throw new Error(
+      `Found more than one user with channel ${channelId} and resource ${resourceId}`
+    );
+  } else {
+    return null;
+  }
 }
