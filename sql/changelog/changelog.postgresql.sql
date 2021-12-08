@@ -66,3 +66,6 @@ ALTER TABLE recurring_events DROP COLUMN push_notification_resource_id;
 ALTER TABLE users ADD COLUMN push_notification_channel_id text UNIQUE;
 ALTER TABLE users ADD COLUMN push_notification_resource_id text UNIQUE;
 ALTER TABLE users ADD COLUMN watching_until timestamptz;
+
+-- changeset alex:1638486674
+ALTER TABLE events ADD COLUMN summary text;

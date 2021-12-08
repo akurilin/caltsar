@@ -1,6 +1,7 @@
 import { calendar_v3 } from "@googleapis/calendar";
 import { Request, Response, NextFunction } from "express";
 import { UserEntity } from "../models/user";
+import * as E from "../models/event";
 // import { OAuth2Client } from "googleapis-common";
 // import { GaxiosError } from "gaxios";
 
@@ -88,52 +89,24 @@ export async function handleGet(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const googleClient = req.googleClient;
-  const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
-    auth: googleClient,
-  });
+  const pool = req.pool;
+  const poolClient = await pool.connect();
+  // const googleClient = req.googleClient;
+  // const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
+  //   auth: googleClient,
+  // });
   const user = req.user as UserEntity;
 
   try {
-    const pool = req.pool;
-
-    const dbRecurringEvents = await pool.query(
-      "SELECT * FROM recurring_events WHERE organizer_google_id = $1",
-      [user.googleId]
+    const events = await E.findAllInstancesByOrganizer(
+      poolClient,
+      user.googleId
     );
-
-    const events = await calendarAPI.events.list({
-      calendarId: "primary",
-      timeMin: new Date().toISOString(),
-      // maxResults: 10,
-      // This parameter makes a huge difference to the output. With this on
-      // default you get only the base recurring event with RRULE and the
-      // exception one-offs, whereas without it you get the whole collection
-      // of everything fully expanded, which is a big deal
-      singleEvents: false,
-      // orderBy: "startTime",
-      showDeleted: true,
-    });
-
-    // const events: calendar_v3.Schema$Events = res.data;
-    if (!events.data || !events.data.items) {
-      throw new Error("The events response did not include items");
-    }
-
-    // const recurringEvents: calendar_v3.Schema$Event[] =
-    const recurringEvents: APIEvent[] = events.data.items
-      .filter((e) => Object.prototype.hasOwnProperty.call(e, "recurrence"))
-      .map((e) => {
-        const matchingDbEvent = dbRecurringEvents.rows.find(
-          (dre) => dre["google_id"] === e.id
-        );
-        const apiEvent = e as APIEvent;
-        apiEvent.tracked = matchingDbEvent ? matchingDbEvent["tracked"] : false;
-        return apiEvent;
-      });
-    res.status(200).json(recurringEvents);
+    res.status(200).json(events);
   } catch (err) {
     console.log(err);
     next(err);
+  } finally {
+    poolClient.release();
   }
 }

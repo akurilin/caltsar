@@ -265,6 +265,7 @@ app.delete(
   "/users/me",
   ensureUserIsLoggedIn,
   injectDBPool(pool),
+  injectGoogleClient(googleAPIClients),
   UserHandler.deleteSelfUser
 );
 
@@ -272,7 +273,7 @@ app.get(
   "/events",
   ensureUserIsLoggedIn,
   injectDBPool(pool),
-  injectGoogleClient(googleAPIClients),
+  // injectGoogleClient(googleAPIClients),
   Events.handleGet
 );
 
@@ -291,8 +292,7 @@ app.delete(
   Trackings.handleDelete
 );
 
-// make this a POST maybe?
-app.get(
+app.post(
   "/sync",
   ensureUserIsLoggedIn,
   injectDBPool(pool),

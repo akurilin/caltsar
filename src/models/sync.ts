@@ -117,19 +117,20 @@ export async function runSync(
   // console.log(insertRecurringEventsQuery);
   await poolClient.query(insertRecurringEventsQuery);
 
-  const instancesValues = activeInstances.map((item) => {
-    if (!item.end || !item.end.dateTime || !item.end.timeZone) {
+  const instancesValues = activeInstances.map((event) => {
+    if (!event.end || !event.end.dateTime || !event.end.timeZone) {
       throw new Error("The event is missing end time properties");
     }
     return [
-      item.id,
-      item.recurringEventId,
-      new Date(item.end.dateTime),
-      item.end.timeZone,
+      event.id,
+      event.recurringEventId,
+      new Date(event.end.dateTime),
+      event.end.timeZone,
+      event.summary,
     ];
   });
   const insertInstancesQuery = pgformat(
-    `INSERT INTO events (google_id, recurring_event_google_id, end_date_time, time_zone)
+    `INSERT INTO events (google_id, recurring_event_google_id, end_date_time, time_zone, summary)
       VALUES %L
       ON CONFLICT (google_id) DO UPDATE SET end_date_time = EXCLUDED.end_date_time, time_zone = EXCLUDED.time_zone`,
     instancesValues
