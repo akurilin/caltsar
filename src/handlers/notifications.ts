@@ -58,7 +58,7 @@ export async function handlePost(
         });
 
         // the meat of the execution
-        await runSync(calendarAPI, pgClient, user);
+        await runSync(pgClient, calendarAPI, user);
 
         await pgClient.query("COMMIT");
         res.status(200).json({});

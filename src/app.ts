@@ -23,6 +23,7 @@ import * as UserHandler from "./handlers/userhandler";
 import * as Events from "./handlers/events";
 import * as Trackings from "./handlers/trackings";
 import * as Notifications from "./handlers/notifications";
+import * as Sync from "./handlers/sync";
 
 // declaration merging
 declare global {
@@ -297,7 +298,7 @@ app.post(
   ensureUserIsLoggedIn,
   injectDBPool(pool),
   injectGoogleClient(googleAPIClients),
-  Trackings.handleSync
+  Sync.handleSync
 );
 
 // NB: this will not have the standard cookie we expect authenticated users to

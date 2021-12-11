@@ -38,10 +38,11 @@ async function paginateList(
 // database for a sufficiently old and beefy calendar
 // assumes a transaction was already started by the caller of this fn
 export async function runSync(
-  calendarAPI: calendar_v3.Calendar,
   poolClient: PoolClient,
+  calendarAPI: calendar_v3.Calendar,
   user: UserEntity
 ): Promise<void> {
+  console.log("runSync");
   // const poolClient = await pool.connect();
   // NB this will all be done in server time (likely UTC), but at some point
   // we'll want to do this with respect to the local time of the calendar we're
