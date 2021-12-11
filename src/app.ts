@@ -205,12 +205,12 @@ const sess = {
 // Passport defines User as {} anyway
 /* eslint-disable @typescript-eslint/no-explicit-any */
 passport.serializeUser(function (user: any, done) {
-  console.log("passport.serializeUser");
+  // console.log("passport.serializeUser");
   done(null, user.id);
 });
 
 passport.deserializeUser(function (id: number, done) {
-  console.log("passport.deserializeUser");
+  // console.log("passport.deserializeUser");
   user.findById(pool, id, (err: Error | null, user: user.UserEntity | null) => {
     done(err, user);
   });
@@ -255,7 +255,7 @@ app.get(
 app.get(
   "/auth/google/callback",
   passport.authenticate("google", {
-    successRedirect: `${process.env.FRONTEND_URI}/login-success`,
+    successRedirect: `${process.env.FRONTEND_URI}/`,
     failureRedirect: `${process.env.FRONTEND_URI}#failed-login`,
   })
 );

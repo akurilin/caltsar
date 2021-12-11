@@ -234,9 +234,9 @@ export async function handleDelete(
       } catch (stopError) {
         const err = stopError as GaxiosError;
         console.error(err);
-        // it's possible this watching subscription is already dead, so
-        // there's nothing for us to stop watching, and we can proceed with
-        // the happy path
+        // it's possible this watching subscription has expired, so there's
+        // nothing for us to stop watching on Google's end, and we can proceed
+        // with the happy path
         if (err.code != "404") {
           throw stopError;
         } else {

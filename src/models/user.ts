@@ -143,7 +143,7 @@ export function findById(
   id: number,
   callback: CallbackFunction
 ): void {
-  console.log("User.findById");
+  // console.log("User.findById");
   pool.query("SELECT * FROM users WHERE id = $1", [id], (err, res) => {
     if (err) {
       console.log("User.findById - error");

@@ -21,6 +21,7 @@ async function paginateList(
     }
 
     // retrieve all instances that we'll want to re-add to the
+    // undefined pageToken == first call to the API
     console.log(`Calling events.list with pageToken ${nextPageToken}`);
     options.pageToken = nextPageToken;
     eventsRes = await calendarAPI.events.list(options);
