@@ -69,3 +69,7 @@ ALTER TABLE users ADD COLUMN watching_until timestamptz;
 
 -- changeset alex:1638486674
 ALTER TABLE events ADD COLUMN summary text;
+ALTER TABLE events ADD COLUMN start_date_time timestamp DEFAULT now() NOT NULL;
+ALTER TABLE events ALTER COLUMN start_date_time DROP DEFAULT;
+-- rollback ALTER TABLE events DROP COLUMN summary;
+-- rollback ALTER TABLE events DROP COLUMN start_date_time;

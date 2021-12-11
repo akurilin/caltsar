@@ -5,6 +5,7 @@ import pgformat from "pg-format";
 interface EventEntity {
   googleId: string;
   recurringEventGoogleId: string;
+  startDateTime: Date;
   endDateTime: Date;
   timeZone: string;
   summary: string;
@@ -16,6 +17,7 @@ function convertDBRowToEntity(row: any): EventEntity {
   return {
     googleId: row.google_id,
     recurringEventGoogleId: row.recurring_event_google_id,
+    startDateTime: new Date(row.start_date_time),
     endDateTime: new Date(row.end_date_time),
     timeZone: row.time_zone,
     summary: row.summary,

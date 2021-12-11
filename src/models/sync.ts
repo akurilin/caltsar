@@ -118,21 +118,29 @@ export async function runSync(
   await poolClient.query(insertRecurringEventsQuery);
 
   const instancesValues = activeInstances.map((event) => {
-    if (!event.end || !event.end.dateTime || !event.end.timeZone) {
+    if (
+      !event.start ||
+      !event.start.dateTime ||
+      !event.end ||
+      !event.end.dateTime ||
+      // the two timezones should always be the same
+      !event.end.timeZone
+    ) {
       throw new Error("The event is missing end time properties");
     }
     return [
       event.id,
       event.recurringEventId,
+      new Date(event.start.dateTime),
       new Date(event.end.dateTime),
       event.end.timeZone,
       event.summary,
     ];
   });
   const insertInstancesQuery = pgformat(
-    `INSERT INTO events (google_id, recurring_event_google_id, end_date_time, time_zone, summary)
-      VALUES %L
-      ON CONFLICT (google_id) DO UPDATE SET end_date_time = EXCLUDED.end_date_time, time_zone = EXCLUDED.time_zone`,
+    `INSERT INTO events (google_id, recurring_event_google_id, start_date_time, end_date_time, time_zone, summary)
+     VALUES %L
+     ON CONFLICT (google_id) DO UPDATE SET start_date_time = EXCLUDED.start_date_time, end_date_time = EXCLUDED.end_date_time, time_zone = EXCLUDED.time_zone`,
     instancesValues
   );
   await poolClient.query(insertInstancesQuery);

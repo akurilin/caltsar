@@ -1,14 +1,14 @@
-import { calendar_v3 } from "@googleapis/calendar";
 import { Request, Response, NextFunction } from "express";
 import { UserEntity } from "../models/user";
 import * as E from "../models/event";
+// import { calendar_v3 } from "@googleapis/calendar";
 // import { OAuth2Client } from "googleapis-common";
 // import { GaxiosError } from "gaxios";
 
 // extends the google schema for event with our own additional fields
-interface APIEvent extends calendar_v3.Schema$Event {
-  tracked: boolean;
-}
+// interface APIEvent extends calendar_v3.Schema$Event {
+//   tracked: boolean;
+// }
 
 //
 // Keeping this around as an example of how to handle random gaxios errors that

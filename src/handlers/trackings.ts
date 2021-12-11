@@ -194,16 +194,16 @@ export async function handleDelete(
     // maybe somewhat unintuitive all things considered
     await poolClient.query(
       `UPDATE recurring_events
-      SET tracked = false
-      WHERE google_id = $1 AND organizer_google_id = $2`,
+       SET tracked = false
+       WHERE google_id = $1 AND organizer_google_id = $2`,
       [recurringEventId, user.googleId]
     );
 
     // could be optimized with just a count
     const trackedRecurringEventsQuery = await poolClient.query(
       `SELECT *
-      FROM recurring_events
-      WHERE organizer_google_id = $1 AND tracked = true`,
+       FROM recurring_events
+       WHERE organizer_google_id = $1 AND tracked = true`,
       [user.googleId]
     );
 
@@ -213,20 +213,27 @@ export async function handleDelete(
     if (trackedRecurringEventsQuery.rows.length === 0) {
       await poolClient.query(
         `UPDATE users
-        SET push_notification_channel_id = NULL, push_notification_resource_id = NULL, watching_until = NULL
-        WHERE id = $1`,
+         SET push_notification_channel_id = NULL, push_notification_resource_id = NULL, watching_until = NULL
+         WHERE id = $1`,
         [user.id]
       );
 
       try {
-        await calendarAPI.channels.stop({
-          requestBody: {
-            id: user.pushNotificationChannelId,
-            resourceId: user.pushNotificationResourceId,
-          },
-        });
+        // it's possble we're repeating the delete a second time, and the channel has already been
+        // stopped, so there's no point in repeating this operation since we
+        // don't even track the original identifiers for the channel anymore
+        // so we NOOP and proceed
+        if (user.pushNotificationChannelId && user.pushNotificationResourceId) {
+          await calendarAPI.channels.stop({
+            requestBody: {
+              id: user.pushNotificationChannelId,
+              resourceId: user.pushNotificationResourceId,
+            },
+          });
+        }
       } catch (stopError) {
         const err = stopError as GaxiosError;
+        console.error(err);
         // it's possible this watching subscription is already dead, so
         // there's nothing for us to stop watching, and we can proceed with
         // the happy path
