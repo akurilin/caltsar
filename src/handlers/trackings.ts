@@ -79,29 +79,31 @@ export async function handlePost(
   const user = req.user as UserEntity;
   const pool = req.pool;
   const poolClient = await pool.connect();
-  const googleClient = req.googleClient;
   const recurringEventId = req.params.recurringEventId;
-  const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
-    auth: googleClient,
-  });
 
   try {
     // this call is mostly only needed to get an authoritative summary name
     // assuming we can't trust instances to be representative of the true title
-    const getResult = await calendarAPI.events.get({
-      calendarId: "primary",
-      eventId: recurringEventId,
-      maxAttendees: 1,
-    });
-    const event: calendar_v3.Schema$Event = getResult.data;
+    // const getResult = await calendarAPI.events.get({
+    //   calendarId: "primary",
+    //   eventId: recurringEventId,
+    //   maxAttendees: 1,
+    // });
+    // const event: calendar_v3.Schema$Event = getResult.data;
+
+    const queryRes = await poolClient.query(
+      `SELECT *
+         FROM recurring_events
+         WHERE google_id = $1 AND organizer_google_id = $2`,
+      [recurringEventId, user.googleId]
+    );
+    const recEvent = queryRes.rows[0];
 
     // Handle all the common error cases
-    if (event.organizer && event.organizer.email != user.email) {
-      res
-        .status(400)
-        .json({ message: "Only the organizer can track a recurring event" });
-    } else if (event.status === "cancelled") {
-      res.status(400).json({ message: "You cannot track a cancelled event" });
+    if (!recEvent) {
+      res.status(400).json({ message: "No such event found" });
+      // } else if (event.status === "cancelled") {
+      //   res.status(400).json({ message: "You cannot track a cancelled event" });
     } else {
       await poolClient.query("BEGIN");
 
@@ -111,8 +113,6 @@ export async function handlePost(
          WHERE google_id = $1 AND organizer_google_id = $2`,
         [recurringEventId, user.googleId]
       );
-
-      // await signUpForNotifications(poolClient, calendarAPI, user);
 
       await poolClient.query("COMMIT");
       res.status(200).json({
@@ -136,9 +136,6 @@ export async function handleDelete(
   const poolClient = await pool.connect();
   const user = req.user as UserEntity;
   const googleClient = req.googleClient;
-  const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
-    auth: googleClient,
-  });
   const recurringEventId = req.params.recurringEventId;
   try {
     await poolClient.query("BEGIN");
@@ -159,13 +156,6 @@ export async function handleDelete(
        WHERE organizer_google_id = $1 AND tracked = true`,
       [user.googleId]
     );
-
-    // if there are no more tracked recurring events, we want to go ahead and
-    // delete push notifications from the user and tell Google to stop sending
-    // them
-    // if (trackedRecurringEventsQuery.rows.length === 0) {
-    //   stopN
-    // }
 
     await poolClient.query("COMMIT");
     res.status(200).json({ message: "Tracking stopped" });

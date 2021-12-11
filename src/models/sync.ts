@@ -87,12 +87,22 @@ export async function runSync(
   );
 
   const activeRecurring = allRecurringEvents.filter(
-    (i) => i.status != "cancelled" && i.recurrence
+    (i) =>
+      i.status != "cancelled" &&
+      i.recurrence &&
+      i.organizer &&
+      i.organizer.email == user.email
   );
   const cancelledRecurring = allRecurringEvents.filter(
-    (i) => i.status == "cancelled" && i.recurrence
+    (i) =>
+      i.status == "cancelled" &&
+      i.recurrence &&
+      i.organizer &&
+      i.organizer.email == user.email
   );
-  const activeInstances = allActiveInstances.filter((i) => i.recurringEventId);
+  const activeInstances = allActiveInstances.filter(
+    (i) => i.recurringEventId && i.organizer && i.organizer.email == user.email
+  );
 
   // NB: we're blowing away all of the events corresponding to all of the
   // recurring events in the selected time period
