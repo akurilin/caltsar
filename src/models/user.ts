@@ -45,13 +45,15 @@ function convertDBRowToEntity(row: any): UserEntity {
   };
 }
 
-export function createUser(
-  pool: Pool,
+export async function createUser(
+  poolClient: PoolClient,
   params: User,
   callback: CallbackFunction
-): void {
-  pool.query(
-    "INSERT INTO users (google_id, first_name, last_name, email, access_token, refresh_token) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+): Promise<UserEntity> {
+  const res = await poolClient.query(
+    `INSERT INTO users (google_id, first_name, last_name, email, access_token, refresh_token)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING *`,
     [
       params.googleId,
       params.firstName,
@@ -59,15 +61,9 @@ export function createUser(
       params.email,
       params.accessToken,
       params.refreshToken,
-    ],
-    (err, res) => {
-      if (err) {
-        callback(err, null);
-      } else {
-        return callback(null, convertDBRowToEntity(res.rows[0]));
-      }
-    }
+    ]
   );
+  return convertDBRowToEntity(res.rows[0]);
 }
 
 export async function updateTokens(

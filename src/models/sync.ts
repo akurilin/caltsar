@@ -1,6 +1,11 @@
 import { calendar_v3 } from "@googleapis/calendar";
 import pgformat from "pg-format";
 import { UserEntity } from "../models/user";
+import {
+  RecurringEvent,
+  convertGoogleEventsToRecurringEvents,
+  insertRecurringEvents,
+} from "../models/recurring-event";
 import { PoolClient } from "pg";
 import dayjs from "dayjs";
 
@@ -122,12 +127,17 @@ export async function runSync(
 
   // we will attempt to insert remaining active recurring events a second time
   // and ignore the confict when it happens
-  const insertRecurringEventsQuery = pgformat(
-    `INSERT INTO recurring_events (google_id, summary, tracked, organizer_google_id) VALUES %L ON CONFLICT (google_id) DO UPDATE SET summary = EXCLUDED.summary`,
-    activeRecurring.map((e) => [e.id, e.summary, false, user.googleId])
+  // const insertRecurringEventsQuery = pgformat(
+  //   `INSERT INTO recurring_events (google_id, summary, tracked, organizer_google_id) VALUES %L ON CONFLICT (google_id) DO UPDATE SET summary = EXCLUDED.summary`,
+  //   activeRecurring.map((e) => [e.id, e.summary, false, user.googleId])
+  // );
+  // const input: RecurringEvent[] = activeRecurring.map(e => return {googleId: e.id, summary: e.summary, tracked: false, organizerGoogleId: user.googleId});
+  await insertRecurringEvents(
+    poolClient,
+    convertGoogleEventsToRecurringEvents(activeRecurring, user.googleId)
   );
   // console.log(insertRecurringEventsQuery);
-  await poolClient.query(insertRecurringEventsQuery);
+  // await poolClient.query(insertRecurringEventsQuery);
 
   const instancesValues = activeInstances.map((event) => {
     if (
