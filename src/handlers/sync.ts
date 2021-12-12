@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import { calendar_v3 } from "@googleapis/calendar";
 import { UserEntity } from "../models/user";
 // import { v4 as uuidv4 } from "uuid";
-import { GaxiosError } from "gaxios";
 import { runSync } from "../models/sync";
 import { resetNotifications } from "../models/notification";
 

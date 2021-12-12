@@ -13,18 +13,14 @@ beforeAll(async () => {
     await poolClient.query("BEGIN");
     await poolClient.query("TRUNCATE users CASCADE");
     await poolClient.query("TRUNCATE sessions CASCADE");
-    const user = await U.createUser(
-      poolClient,
-      {
-        googleId: "123",
-        firstName: "Alice",
-        lastName: "Andrews",
-        email: "alice.andrews@gmail.com",
-        accessToken: "foo",
-        refreshToken: "bar",
-      },
-      () => {}
-    );
+    const user = await U.createUser(poolClient, {
+      googleId: "123",
+      firstName: "Alice",
+      lastName: "Andrews",
+      email: "alice.andrews@gmail.com",
+      accessToken: "foo",
+      refreshToken: "bar",
+    });
     await poolClient.query(
       `INSERT INTO sessions (sid, sess, expire)
        VALUES($1, $2, $3)

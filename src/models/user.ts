@@ -47,8 +47,7 @@ function convertDBRowToEntity(row: any): UserEntity {
 
 export async function createUser(
   poolClient: PoolClient,
-  params: User,
-  callback: CallbackFunction
+  params: User
 ): Promise<UserEntity> {
   const res = await poolClient.query(
     `INSERT INTO users (google_id, first_name, last_name, email, access_token, refresh_token)

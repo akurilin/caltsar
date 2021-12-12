@@ -2,7 +2,6 @@ import { calendar_v3 } from "@googleapis/calendar";
 import pgformat from "pg-format";
 import { UserEntity } from "../models/user";
 import {
-  RecurringEvent,
   convertGoogleEventsToRecurringEvents,
   insertRecurringEvents,
 } from "../models/recurring-event";

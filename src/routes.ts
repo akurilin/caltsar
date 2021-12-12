@@ -1,4 +1,4 @@
-import express, { Express, Request } from "express";
+import { Express } from "express";
 import { Pool } from "pg";
 import passport from "passport";
 import * as UserHandler from "./handlers/userhandler";
@@ -11,7 +11,7 @@ import {
   injectDBPool,
   injectGoogleClient,
 } from "./middleware";
-import { IdToClient, upsertGoogleAPIClient } from "./googleapiclients";
+import { IdToClient } from "./googleapiclients";
 
 export default function setUpRoutes(
   app: Express,

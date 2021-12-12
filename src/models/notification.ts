@@ -1,4 +1,3 @@
-import { Request, Response, NextFunction } from "express";
 import { calendar_v3 } from "@googleapis/calendar";
 import { PoolClient } from "pg";
 import { UserEntity } from "../models/user";
@@ -9,7 +8,7 @@ export async function resetNotifications(
   poolClient: PoolClient,
   calendarAPI: calendar_v3.Calendar,
   user: UserEntity
-) {
+): Promise<void> {
   console.log("resetNotifications");
   // wipe existing notification registration to start with a clean one
   await stopNotifications(poolClient, calendarAPI, user);
@@ -83,7 +82,7 @@ export async function stopNotifications(
   poolClient: PoolClient,
   calendarAPI: calendar_v3.Calendar,
   user: UserEntity
-) {
+): Promise<void> {
   await poolClient.query(
     `UPDATE users
          SET push_notification_channel_id = NULL, push_notification_resource_id = NULL, watching_until = NULL

@@ -1,8 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { calendar_v3 } from "@googleapis/calendar";
 import { UserEntity } from "../models/user";
-import { v4 as uuidv4 } from "uuid";
-import { GaxiosError } from "gaxios";
 
 export async function handlePost(
   req: Request,
