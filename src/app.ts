@@ -152,6 +152,7 @@ passport.use(
 //
 const app: Express = express();
 
+// helmet increases security by setting various HTTP headers
 app.use(helmet());
 
 //
