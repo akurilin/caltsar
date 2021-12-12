@@ -47,7 +47,6 @@ export async function runSync(
   user: UserEntity
 ): Promise<void> {
   console.log("runSync");
-  // const poolClient = await pool.connect();
   // NB this will all be done in server time (likely UTC), but at some point
   // we'll want to do this with respect to the local time of the calendar we're
   // working with

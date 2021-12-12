@@ -90,13 +90,9 @@ export async function handleGet(
   next: NextFunction
 ): Promise<void> {
   const pool = req.pool;
-  const poolClient = await pool.connect();
-  // const googleClient = req.googleClient;
-  // const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
-  //   auth: googleClient,
-  // });
   const user = req.user as UserEntity;
 
+  const poolClient = await pool.connect();
   try {
     const events = await E.findAllInstancesByOrganizer(
       poolClient,

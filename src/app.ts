@@ -6,7 +6,7 @@ import cors from "cors";
 import helmet from "helmet";
 import * as dotenv from "dotenv";
 import * as user from "./models/user";
-import { Pool } from "pg";
+import { Pool, PoolClient } from "pg";
 import passport from "passport";
 import {
   Strategy as GoogleStrategy,
@@ -61,15 +61,22 @@ if (
 // Configure Postgres
 //
 
-export const pool = new Pool();
+export const pool = new Pool({
+  // timeout trying to get an active connection from the pool
+  // usually a problem when we are leaking unclosed client connections and this
+  // prevents a total deadlock
+  connectionTimeoutMillis: 5000,
+});
 
-//
-// uncomment the below just to sanity check the PG connection settings
-// string
-//
-// pool.query("SELECT NOW()", (err, res) => {
-//   console.log(err, res);
-//   pool.end();
+// pool.on("connect", (client) => {
+//   console.log("Client connected");
+//   // client.query('SET DATESTYLE = iso, mdy')
+// });
+// pool.on("acquire", (client) => {
+//   console.log("Client acquired");
+// });
+// pool.on("remove", (client) => {
+//   console.log("Client removed");
 // });
 
 // the pool will emit an error on behalf of any idle clients

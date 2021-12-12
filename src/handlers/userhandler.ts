@@ -33,12 +33,12 @@ export async function deleteSelfUser(
 ): Promise<void> {
   const user = req.user as U.UserEntity;
   const pool = req.pool;
-  const poolClient = await pool.connect();
   const googleClient = req.googleClient;
   const calendarAPI: calendar_v3.Calendar = new calendar_v3.Calendar({
     auth: googleClient,
   });
 
+  const poolClient = await pool.connect();
   try {
     await poolClient.query("BEGIN");
     const recEvents = await RE.findByOrganizer(poolClient, user.googleId);

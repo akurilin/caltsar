@@ -30,13 +30,13 @@ export async function handlePost(
   // console.log("NOTIFICATIONS REQ:");
   // console.log(req.headers);
   const pool = req.pool;
-  const pgClient = await pool.connect();
   const pushNotification = headersToPushNotification(req.headers);
 
   if (pushNotification.resourceState == "sync") {
     // NOOP
     res.status(200).json({});
   } else if (pushNotification.resourceState == "exists") {
+    const pgClient = await pool.connect();
     try {
       await pgClient.query("BEGIN");
 

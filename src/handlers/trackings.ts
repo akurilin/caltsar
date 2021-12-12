@@ -8,9 +8,9 @@ export async function handlePost(
 ): Promise<void> {
   const user = req.user as UserEntity;
   const pool = req.pool;
-  const poolClient = await pool.connect();
   const recurringEventId = req.params.recurringEventId;
 
+  const poolClient = await pool.connect();
   try {
     await poolClient.query("BEGIN");
     const queryRes = await poolClient.query(
@@ -55,9 +55,9 @@ export async function handleDelete(
   next: NextFunction
 ): Promise<void> {
   const pool = req.pool;
-  const poolClient = await pool.connect();
   const user = req.user as UserEntity;
   const recurringEventId = req.params.recurringEventId;
+  const poolClient = await pool.connect();
   try {
     await poolClient.query("BEGIN");
 
