@@ -32,7 +32,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [16.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
@@ -45,7 +45,7 @@ jobs:
           PGPASSWORD: password
       - uses: actions/checkout@v2
       - run: tree
-      - run: psql -h localhost -d caltsar_test -U postgres -f ./sql/changelog/changelog.sql
+      - run: psql -h localhost -d caltsar_test -U postgres -f ./sql/changelog/changelog.postgresql.sql
         env:
           PGPASSWORD: password
       - name: Use Node.js ${{ matrix.node-version }}
