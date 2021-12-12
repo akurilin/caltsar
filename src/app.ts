@@ -13,17 +13,9 @@ import {
   VerifyCallback,
 } from "passport-google-oauth2";
 import { OAuth2Client } from "google-auth-library";
-import { idToClient, upsertGoogleAPIClient } from "./googleapiclients";
-import {
-  ensureUserIsLoggedIn,
-  injectDBPool,
-  injectGoogleClient,
-} from "./middleware";
-import * as UserHandler from "./handlers/userhandler";
-import * as Events from "./handlers/events";
-import * as Trackings from "./handlers/trackings";
-import * as Notifications from "./handlers/notifications";
-import * as Sync from "./handlers/sync";
+import { IdToClient, upsertGoogleAPIClient } from "./googleapiclients";
+
+import setUpRoutes from "./routes";
 
 // declaration merging
 declare global {
@@ -45,7 +37,7 @@ declare global {
 // TODO: this feels like an unnecessary optimization, we could be creating a new
 // client on the fly on every request and scale just fine pretty much forever
 // initialize this to be empty
-const googleAPIClients: idToClient = {};
+const googleAPIClients: IdToClient = {};
 
 dotenv.config();
 if (
@@ -232,93 +224,8 @@ app.use(express.json());
 app.use(passport.initialize());
 app.use(passport.session());
 
-//
-// Browser is directed to this route from the login page
-//
-app.get(
-  "/auth/google",
-  passport.authenticate("google", {
-    scope: [
-      "email",
-      "profile",
-      "https://www.googleapis.com/auth/calendar.events.readonly",
-    ],
-    // tells google to send us a refresh_token so that we can keep using
-    // the Google API on behalf of the user even when they're not actively in
-    // the app
-    accessType: "offline",
-  })
-);
-
-//
-// Google redirects the browser here after consent is given
-//
-app.get(
-  "/auth/google/callback",
-  passport.authenticate("google", {
-    successRedirect: `${process.env.FRONTEND_URI}/`,
-    failureRedirect: `${process.env.FRONTEND_URI}#failed-login`,
-  })
-);
-
-app.get("/users/me", ensureUserIsLoggedIn, UserHandler.getSelfUser);
-app.delete(
-  "/users/me",
-  ensureUserIsLoggedIn,
-  injectDBPool(pool),
-  injectGoogleClient(googleAPIClients),
-  UserHandler.deleteSelfUser
-);
-
-app.get(
-  "/events",
-  ensureUserIsLoggedIn,
-  injectDBPool(pool),
-  // injectGoogleClient(googleAPIClients),
-  Events.handleGet
-);
-
-app.post(
-  "/trackings/:recurringEventId",
-  ensureUserIsLoggedIn,
-  injectDBPool(pool),
-  injectGoogleClient(googleAPIClients),
-  Trackings.handlePost
-);
-app.delete(
-  "/trackings/:recurringEventId",
-  ensureUserIsLoggedIn,
-  injectDBPool(pool),
-  injectGoogleClient(googleAPIClients),
-  Trackings.handleDelete
-);
-
-app.post(
-  "/sync",
-  ensureUserIsLoggedIn,
-  injectDBPool(pool),
-  injectGoogleClient(googleAPIClients),
-  Sync.handleSync
-);
-
-// NB: this will not have the standard cookie we expect authenticated users to
-// call us with. This is an unauthed webhook call from Google with all of the
-// information being stored in the headers
-// Because this is an unauthed route, we have to be careful as far as what we
-// let the caller do with this operation, since we currently don't have a way to
-// prevent non-Google from calling into this
-app.post("/notifications", injectDBPool(pool), Notifications.handlePost);
-
-// TODO: consider turning this into a DELETE /sessions
-app.get("/auth/logout", ensureUserIsLoggedIn, (req, res) => {
-  req.session.destroy(() => {
-    // this is the default library name for the session cookie associated with
-    // the user session in whatever store of your choosing
-    // clear the cookie if the session was successfully destroyed in the store
-    res.clearCookie("connect.sid");
-    return res.status(200).json({});
-  });
-});
+// where all of our routes are set
+setUpRoutes(app, pool, googleAPIClients);
 
 /** Error handling */
 // Has to be defined last

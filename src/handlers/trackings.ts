@@ -135,7 +135,6 @@ export async function handleDelete(
   const pool = req.pool;
   const poolClient = await pool.connect();
   const user = req.user as UserEntity;
-  const googleClient = req.googleClient;
   const recurringEventId = req.params.recurringEventId;
   try {
     await poolClient.query("BEGIN");

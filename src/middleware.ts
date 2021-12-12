@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { Pool } from "pg";
-import { idToClient, upsertGoogleAPIClient } from "./googleapiclients";
+import { IdToClient, upsertGoogleAPIClient } from "./googleapiclients";
 import * as user from "./models/user";
 
 //
@@ -18,7 +18,7 @@ export function ensureUserIsLoggedIn(
   }
 }
 
-export function injectGoogleClient(googleAPIClients: idToClient) {
+export function injectGoogleClient(googleAPIClients: IdToClient) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       throw new Error("No signed in user for google client prep");

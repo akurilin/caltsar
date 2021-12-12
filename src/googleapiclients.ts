@@ -3,7 +3,7 @@ import { auth } from "@googleapis/calendar";
 import { Pool } from "pg";
 import * as user from "./models/user";
 
-export interface idToClient {
+export interface IdToClient {
   [key: number]: OAuth2Client;
 }
 
@@ -79,7 +79,7 @@ export function generateNewAPIClient(
 // map
 export function upsertGoogleAPIClient(
   pool: Pool,
-  clients: idToClient,
+  clients: IdToClient,
   userId: number,
   accessToken: string,
   refreshToken: string
