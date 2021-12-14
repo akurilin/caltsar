@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from "pg";
+import { Pool, PoolClient, QueryResult } from "pg";
 
 export interface User {
   googleId: string;
@@ -97,40 +97,69 @@ export async function updateAccessToken(
   }
 }
 
-export function findOrCreate(
+export function upsert(
   pool: Pool,
   params: User,
   callback: CallbackFunction
 ): void {
   console.log("User.findOrCreate");
 
-  // these's a chance that this conflicts on email, as opposed to the google_id,
-  // and I'm not sure what exactly to do in that case given that both columns
-  // are unique. One would hope that PG is clever enough to not arbitrary cycle
-  // through conflict targets and pick one, but instead instead prioritizes the
-  // one chosen in the ON CONFLICT clause
-  pool.query(
-    `INSERT INTO users (google_id, first_name, last_name, email, access_token, refresh_token)
+  const callbackFn = (err: Error, res: QueryResult) => {
+    if (err) {
+      console.error(err);
+      console.error("Params of when upsert was called");
+      console.error(params);
+      callback(new Error("Could not insert or update user"), null);
+    } else {
+      callback(null, convertDBRowToEntity(res.rows[0]));
+    }
+  };
+
+  // every user login after the initial one when the user consents to the app
+  // accessing their data will not contain the refresh token, so we have to
+  // account for that
+  if (params.refreshToken) {
+    // these's a chance that this conflicts on email, as opposed to the google_id,
+    // and I'm not sure what exactly to do in that case given that both columns
+    // are unique. One would hope that PG is clever enough to not arbitrary cycle
+    // through conflict targets and pick one, but instead instead prioritizes the
+    // one chosen in the ON CONFLICT clause
+    pool.query(
+      `INSERT INTO users (google_id, first_name, last_name, email, access_token, refresh_token)
              VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (google_id) DO UPDATE SET access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, updated_at = NOW()
              RETURNING *`,
-    [
-      params.googleId,
-      params.firstName,
-      params.lastName,
-      params.email,
-      params.accessToken,
-      params.refreshToken,
-    ],
-    (err, res) => {
-      if (err) {
-        console.error(err);
-        callback(new Error("Could not create or update user"), null);
-      } else {
-        callback(null, convertDBRowToEntity(res.rows[0]));
-      }
-    }
-  );
+      [
+        params.googleId,
+        params.firstName,
+        params.lastName,
+        params.email,
+        params.accessToken,
+        params.refreshToken,
+      ],
+      callbackFn
+    );
+  } else {
+    // NB: there is a broken corner case where we lost the user row for some
+    // reason, but the user is not signing up for the first time, which will
+    // trigger this query and which update no rows and fail to log in. In these
+    // cases the only fix is for the user to delete consent from the app and
+    // re-login again
+    pool.query(
+      `UPDATE users
+       SET first_name = $1, last_name = $2, email = $3, access_token = $4, updated_at = NOW()
+       WHERE google_id = $5
+       RETURNING *`,
+      [
+        params.firstName,
+        params.lastName,
+        params.email,
+        params.accessToken,
+        params.googleId,
+      ],
+      callbackFn
+    );
+  }
 }
 
 export function findById(

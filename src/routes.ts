@@ -65,8 +65,8 @@ export default function setUpRoutes(
     function (req, res) {
       // the choice here is to either send the user back immediately to the UI
       // or to respond with a 200 and wait for them to do the next step
-      res.redirect(`${process.env.FRONTEND_URI}/`);
-      // res.status(200).json({ message: "Success!" });
+      // res.redirect(`${process.env.FRONTEND_URI}/`);
+      res.status(200).json({ message: "Success!" });
     }
   );
 

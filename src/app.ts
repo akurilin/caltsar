@@ -5,7 +5,6 @@ import morgan from "morgan";
 import cors from "cors";
 import helmet from "helmet";
 import * as dotenv from "dotenv";
-import * as user from "./models/user";
 import { Pool } from "pg";
 import passport from "passport";
 import {
@@ -135,10 +134,10 @@ passport.use(
         accessToken: accessToken,
         refreshToken: refreshToken,
       };
-      user.findOrCreate(
+      U.upsert(
         pool,
         newUserParams,
-        (err: Error | null, userItem: user.UserEntity | null) => {
+        (err: Error | null, userItem: U.UserEntity | null) => {
           // Assuming the user successfully gets created here if we are to
           // generate a new google API client
           if (userItem) {
@@ -233,7 +232,7 @@ passport.serializeUser(function (user: any, done) {
 
 passport.deserializeUser(function (id: number, done) {
   // console.log("passport.deserializeUser");
-  user.findById(pool, id, (err: Error | null, user: user.UserEntity | null) => {
+  U.findById(pool, id, (err: Error | null, user: U.UserEntity | null) => {
     done(err, user);
   });
 });
