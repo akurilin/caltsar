@@ -7,7 +7,12 @@
     "dev": "PORT=3000 nodemon src/server.ts",
     "build": "rm -rf ./dist/ && npx prettier --check . && npx eslint . --ext .js,.jsx,.ts,.tsx && tsc",
     "test": "rm -rf ./dist/ && PGDATABASE=caltsar_test PORT=4000 jest --detectOpenHandles --passWithNoTests",
-    "test:watch": "PGDATABASE=caltsar_test PORT=4000 jest --detectOpenHandles --watchAll"
+    "test:watch": "PGDATABASE=caltsar_test PORT=4000 jest --detectOpenHandles --watchAll",
+    "ngrok": "ngrok http --region=us --hostname=app.akurilin.com 3000",
+    "psql": "./scripts/psql-local-db.sh",
+    "db:reset": "./scripts/reset-local-db.sh",
+    "db:migrate": "PGDATABASE=caltsar_dev ./scripts/udpate-changelog.sh && PGDATABASE=caltsar_test ./scripts/update-changelog.sh",
+    "db:rollback": "PGDATABASE=caltsar_dev ./scripts/rollback-changelog.sh && PGDATABASE=caltsar_test ./scripts/rollback-changelog.sh"
   },
   "author": "",
   "license": "ISC",
