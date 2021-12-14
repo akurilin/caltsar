@@ -153,6 +153,18 @@ export function findById(
   });
 }
 
+export async function findByIdAsync(
+  pool: Pool,
+  id: number
+): Promise<UserEntity | null> {
+  const res = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
+  if (res.rows[0]) {
+    return convertDBRowToEntity(res.rows[0]);
+  } else {
+    return null;
+  }
+}
+
 export async function fetchByPushNotification(
   poolClient: PoolClient,
   channelId: string,

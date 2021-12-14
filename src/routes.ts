@@ -6,6 +6,7 @@ import * as Events from "./handlers/events";
 import * as Trackings from "./handlers/trackings";
 import * as Notifications from "./handlers/notifications";
 import * as Sync from "./handlers/sync";
+// import * as U from "./models/user";
 import {
   ensureUserIsLoggedIn,
   injectDBPool,
@@ -56,6 +57,17 @@ export default function setUpRoutes(
       successRedirect: `${process.env.FRONTEND_URI}/`,
       failureRedirect: `${process.env.FRONTEND_URI}#failed-login`,
     })
+  );
+
+  app.get(
+    "/auth/testlogin",
+    passport.authenticate("custom"),
+    function (req, res) {
+      // the choice here is to either send the user back immediately to the UI
+      // or to respond with a 200 and wait for them to do the next step
+      res.redirect(`${process.env.FRONTEND_URI}/`);
+      // res.status(200).json({ message: "Success!" });
+    }
   );
 
   // USERS

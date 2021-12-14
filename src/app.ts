@@ -6,12 +6,15 @@ import cors from "cors";
 import helmet from "helmet";
 import * as dotenv from "dotenv";
 import * as user from "./models/user";
-import { Pool, PoolClient } from "pg";
+import { Pool } from "pg";
 import passport from "passport";
 import {
   Strategy as GoogleStrategy,
   VerifyCallback,
 } from "passport-google-oauth2";
+import passportCustom from "passport-custom";
+import * as U from "./models/user";
+
 import { OAuth2Client } from "google-auth-library";
 import { IdToClient, upsertGoogleAPIClient } from "./googleapiclients";
 
@@ -51,7 +54,8 @@ if (
   !process.env.PGDATABASE ||
   !process.env.PGPORT ||
   !process.env.COOKIE_SECRET ||
-  !process.env.FRONTEND_URI
+  !process.env.FRONTEND_URI ||
+  !process.env.TEST_USER_ID
 ) {
   console.error("The app is missing a mandatory environment variable");
   process.exit(1);
@@ -70,7 +74,6 @@ export const pool = new Pool({
 
 // pool.on("connect", (client) => {
 //   console.log("Client connected");
-//   // client.query('SET DATESTYLE = iso, mdy')
 // });
 // pool.on("acquire", (client) => {
 //   console.log("Client acquired");
@@ -152,6 +155,24 @@ passport.use(
       );
     }
   )
+);
+
+// Custom strategy for authenticating as the test user
+const CustomStrategy = passportCustom.Strategy;
+passport.use(
+  "custom",
+  new CustomStrategy(function (req: Request, callback) {
+    const testUserId = process.env.TEST_USER_ID
+      ? parseInt(process.env.TEST_USER_ID, 10)
+      : -1;
+    U.findById(pool, testUserId, (err, user) => {
+      if (user) {
+        callback(null, user);
+      } else {
+        callback(err, null);
+      }
+    });
+  })
 );
 
 //
