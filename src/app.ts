@@ -64,7 +64,16 @@ if (
 // Configure Postgres
 //
 
+// This uses the psql env vars to figure out what to connect to:
+// https://node-postgres.com/features/connecting
+// sample url: postgresql://dbuser:secretpassword@database.server.com:3211/mydb
 export const pool = new Pool({
+  // this will override the env vars if set, otherwise pg will use what's set
+  // in the environment. This is necessary to support Heroku which only gives
+  // you a URL to work with
+  connectionString: process.env.DATABASE_URL
+    ? process.env.DATABASE_URL
+    : `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`,
   // timeout trying to get an active connection from the pool
   // usually a problem when we are leaking unclosed client connections and this
   // prevents a total deadlock

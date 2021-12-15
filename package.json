@@ -13,8 +13,13 @@
     "test:watch": "PGDATABASE=caltsar_test PORT=4000 jest --detectOpenHandles --watchAll",
     "prod": "node -r dotenv/config dist/server.js",
     "ngrok": "ngrok http --region=us --hostname=app.akurilin.com 3000",
-    "psql": "./scripts/psql-local-db.sh",
-    "db:migrate": "PGDATABASE=caltsar_dev ./scripts/udpate-changelog.sh && PGDATABASE=caltsar_test ./scripts/update-changelog.sh",
+    "shellcheck": "find ./scripts/ -name \"*.sh\" -exec shellcheck -s sh {} \\;",
+    "db:psql:dev": "docker exec -it postgres13 psql -U postgres -d caltsar_dev",
+    "db:psql:test": "docker exec -it postgres13 psql -U postgres -d caltsar_test",
+    "db:psql:prod": "docker exec -it postgres13 psql $(heroku config:get DATABASE_URL -a calentsar)",
+    "db:migrate:dev": "PGDATABASE=caltsar_dev ./scripts/update-changelog.sh",
+    "db:migrate:local": "PGDATABASE=caltsar_dev ./scripts/update-changelog.sh && PGDATABASE=caltsar_test ./scripts/update-changelog.sh",
+    "db:migrate:prod": "DATABASE_URL=$(heroku config:get DATABASE_URL -a calentsar) python3 scripts/update-changelog-prod.py",
     "db:reset": "./scripts/reset-local-db.sh",
     "db:rollback": "PGDATABASE=caltsar_dev ./scripts/rollback-changelog.sh && PGDATABASE=caltsar_test ./scripts/rollback-changelog.sh",
     "db:seed": "PGDATABASE=caltsar_dev ./scripts/seed-db.sh",
@@ -23,6 +28,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@googleapis/calendar": "^1.0.1",
     "connect-pg-simple": "^7.0.0",
     "cors": "^2.8.5",
     "dayjs": "^1.10.7",
@@ -41,7 +47,6 @@
     "uuid": "^8.3.2"
   },
   "devDependencies": {
-    "@googleapis/calendar": "^1.0.1",
     "@types/connect-pg-simple": "^4.2.4",
     "@types/cors": "^2.8.12",
     "@types/express": "^4.17.13",
