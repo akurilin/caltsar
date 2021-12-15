@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "src/server.ts",
+  "engines": {
+    "node": "16.x"
+  },
   "scripts": {
     "dev": "nodemon -r dotenv/config src/server.ts",
     "build": "rm -rf ./dist/ && npx prettier --check . && npx eslint . --ext .js,.jsx,.ts,.tsx && tsc",
