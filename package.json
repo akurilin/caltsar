@@ -23,7 +23,8 @@
     "db:reset": "./scripts/reset-local-db.sh",
     "db:rollback": "PGDATABASE=caltsar_dev ./scripts/rollback-changelog.sh && PGDATABASE=caltsar_test ./scripts/rollback-changelog.sh",
     "db:seed": "PGDATABASE=caltsar_dev ./scripts/seed-db.sh",
-    "db:truncate": "PGDATABASE=caltsar_dev ./scripts/truncate-db.sh"
+    "db:truncate": "PGDATABASE=caltsar_dev ./scripts/truncate-db.sh",
+    "heroku:logs:prod": "heroku logs --tail -a calentsar"
   },
   "author": "",
   "license": "ISC",

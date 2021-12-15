@@ -47,17 +47,26 @@ if (
   !process.env.CLIENT_ID ||
   !process.env.CLIENT_SECRET ||
   !process.env.NODE_ENV ||
-  !process.env.PGUSER ||
-  !process.env.PGHOST ||
-  !process.env.PGPASSWORD ||
-  !process.env.PGDATABASE ||
-  !process.env.PGPORT ||
   !process.env.COOKIE_SECRET ||
   !process.env.FRONTEND_URI ||
   !process.env.TEST_USER_ID
 ) {
   console.error("The app is missing a mandatory environment variable");
   process.exit(1);
+}
+if (!process.env.DATABASE_URL) {
+  if (
+    !process.env.PGUSER ||
+    !process.env.PGHOST ||
+    !process.env.PGPASSWORD ||
+    !process.env.PGDATABASE ||
+    !process.env.PGPORT
+  ) {
+    console.error(
+      "No DATABASE_URL set, and some/all of the PG env vars are missing"
+    );
+    process.exit(1);
+  }
 }
 
 //
