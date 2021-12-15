@@ -1,8 +1,10 @@
 import http from "http";
 import app from "./app";
+// import * as dotenv from "dotenv";
 
+// dotenv.config();
 if (!process.env.PORT) {
-  console.error("The app is missing a mandatory environment variable");
+  console.error("Environment variable PORT not set");
   process.exit(1);
 }
 

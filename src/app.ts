@@ -4,7 +4,6 @@ import pgSession from "connect-pg-simple";
 import morgan from "morgan";
 import cors from "cors";
 import helmet from "helmet";
-import * as dotenv from "dotenv";
 import { Pool } from "pg";
 import passport from "passport";
 import {
@@ -41,7 +40,8 @@ declare global {
 // initialize this to be empty
 const googleAPIClients: IdToClient = {};
 
-dotenv.config();
+// This boot-time check makes the rest of the file happy about using env vars
+// that might be null
 if (
   !process.env.PORT ||
   !process.env.CLIENT_ID ||
