@@ -5,3 +5,4 @@ dist
 README.md
 jest.config.js
 .github/*
+.heroku
