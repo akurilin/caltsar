@@ -59,7 +59,7 @@ jobs:
         env:
           CLIENT_ID: foo
           CLIENT_SECRET: bar
-          NODE_DEV: development
+          NODE_ENV: development
           PGUSER: postgres
           PGHOST: localhost
           PGPASSWORD: password
