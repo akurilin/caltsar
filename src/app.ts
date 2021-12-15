@@ -87,6 +87,15 @@ export const pool = new Pool({
   // usually a problem when we are leaking unclosed client connections and this
   // prevents a total deadlock
   connectionTimeoutMillis: 5000,
+
+  // we have no interest in SSL in local dev, but everything on Heroku has
+  // to use SSL when talking to PG
+  ssl:
+    process.env.NODE_ENV == "development"
+      ? undefined
+      : {
+          rejectUnauthorized: false,
+        },
 });
 
 // pool.on("connect", (client) => {
