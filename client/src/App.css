@@ -1,0 +1,140 @@
+.site-layout-content {
+  min-height: 280px;
+  padding: 24px;
+  background: #fff;
+}
+#top-level-layout .logo {
+  float: left;
+  width: 120px;
+  height: 31px;
+  margin: 16px 24px 16px 0;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.ant-table-thead > tr > th {
+  font-weight: 700;
+}
+
+.ant-menu-item-right {
+  text-align: right;
+  float: right;
+  margin-left: auto;
+}
+
+/* Calendar */
+.events {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.events .ant-badge-status {
+  width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.notes-month {
+  font-size: 28px;
+  text-align: center;
+}
+.notes-month section {
+  font-size: 28px;
+}
+
+/* hide the year/month selector */
+.ant-radio-button-wrapper {
+  display: none;
+}
+
+.ant-picker-calendar-full .ant-picker-panel .ant-picker-body th {
+  font-weight: 700;
+}
+.ant-badge-status-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 1);
+  font-weight: 500;
+}
+
+span.ant-badge {
+  background-color: rgb(158, 105, 175);
+  border-color: rgb(158, 105, 175);
+  border-radius: 4px;
+}
+
+.ant-picker-calendar-full .ant-picker-panel .ant-picker-calendar-date {
+  padding: 4px 4px 0;
+}
+
+.events .ant-badge-status {
+  padding: 0 0 0 4px;
+}
+
+/* make sure only calendar event instances can feel clickable */
+.ant-picker-cell {
+  cursor: default;
+}
+
+.ant-badge.ant-badge-status.ant-badge-not-a-wrapper {
+  cursor: pointer;
+}
+
+/* Suppress hover color of each calendar cell and the color of the date changing
+ * depending on which cell we're clicking on */
+.ant-picker-calendar-full
+  .ant-picker-panel
+  .ant-picker-cell:hover
+  .ant-picker-calendar-date {
+  background: #ffffff;
+}
+.ant-picker-cell:hover:not(.ant-picker-cell-in-view) .ant-picker-cell-inner,
+.ant-picker-cell:hover:not(.ant-picker-cell-selected):not(.ant-picker-cell-range-start):not(.ant-picker-cell-range-end):not(.ant-picker-cell-range-hover-start):not(.ant-picker-cell-range-hover-end)
+  .ant-picker-cell-inner {
+  background: #ffffff;
+}
+
+.ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner,
+.ant-picker-cell-in-view.ant-picker-cell-range-start .ant-picker-cell-inner,
+.ant-picker-cell-in-view.ant-picker-cell-range-end .ant-picker-cell-inner {
+  background: #ffffff;
+}
+.ant-picker-calendar-full
+  .ant-picker-panel
+  .ant-picker-cell-selected
+  .ant-picker-calendar-date,
+.ant-picker-calendar-full
+  .ant-picker-panel
+  .ant-picker-cell-selected:hover
+  .ant-picker-calendar-date,
+.ant-picker-calendar-full
+  .ant-picker-panel
+  .ant-picker-cell-selected
+  .ant-picker-calendar-date-today,
+.ant-picker-calendar-full
+  .ant-picker-panel
+  .ant-picker-cell-selected:hover
+  .ant-picker-calendar-date-today {
+  background: #ffffff;
+}
+.ant-picker-calendar-full
+  .ant-picker-panel
+  .ant-picker-cell-selected
+  .ant-picker-calendar-date
+  .ant-picker-calendar-date-value,
+.ant-picker-calendar-full
+  .ant-picker-panel
+  .ant-picker-cell-selected:hover
+  .ant-picker-calendar-date
+  .ant-picker-calendar-date-value,
+.ant-picker-calendar-full
+  .ant-picker-panel
+  .ant-picker-cell-selected
+  .ant-picker-calendar-date-today
+  .ant-picker-calendar-date-value,
+.ant-picker-calendar-full
+  .ant-picker-panel
+  .ant-picker-cell-selected:hover
+  .ant-picker-calendar-date-today
+  .ant-picker-calendar-date-value {
+  color: rgba(0, 0, 0, 0.85);
+}

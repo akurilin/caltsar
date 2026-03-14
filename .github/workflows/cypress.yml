@@ -1,17 +1,12 @@
-name: Node.js CI
+name: Cypress
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
 
 jobs:
-
-  server:
-    name: Server Build & Test
+  build:
     runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:13.4
@@ -33,6 +28,9 @@ jobs:
         node-version: [16.x]
 
     steps:
+      - uses: actions/checkout@v2
+
+      # set up the db
       - run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
@@ -40,26 +38,31 @@ jobs:
       - run: psql -h localhost -d caltsar_test -U postgres -c 'SELECT 1;'
         env:
           PGPASSWORD: password
-      - uses: actions/checkout@v2
-      - run: tree
       - run: psql -h localhost -d caltsar_test -U postgres -f ./server/sql/changelog/changelog.postgresql.sql
         env:
           PGPASSWORD: password
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v2
+      - run: psql -h localhost -d caltsar_test -U postgres -f ./server/sql/seed.sql
+        env:
+          PGPASSWORD: password
+
+      # do npm / node stuff now
+      - uses: actions/setup-node@v2
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
-          cache-dependency-path: server/package-lock.json
-      - run: npm ci
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+      - run: npm install
         working-directory: server
-      - run: npm run build --if-present
+      - run: npm run build
         working-directory: server
-      - run: npm test
+      - run: node dist/server.js &
         working-directory: server
         env:
-          CLIENT_ID: foo
-          CLIENT_SECRET: bar
+          PORT: 3000
+          CLIENT_ID: "486498242972-v25cm8ku0pbdbi4c1fraoqoaqvegs94j.apps.googleusercontent.com"
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
           NODE_ENV: development
           PGUSER: postgres
           PGHOST: localhost
@@ -69,25 +72,24 @@ jobs:
           COOKIE_SECRET: bad kitty
           FRONTEND_URI: http://localhost:3001
           TEST_USER_ID: 1
-      - run: find ./server/scripts/ -name "*.sh" -exec shellcheck -s sh {} \;
-
-  client:
-    name: Client Build & Test
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [16.x]
-
-    steps:
-      - uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v2
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
-          cache-dependency-path: client/package-lock.json
-      - run: npm ci
+      - run: npm install
         working-directory: client
       - run: npm run build --if-present
         working-directory: client
+      - name: Cypress run
+        uses: cypress-io/github-action@v2
+        env:
+          REACT_APP_WEB_PORT: 3001
+          REACT_APP_API_PORT: 3000
+          REACT_APP_API_HOSTNAME: localhost
+          REACT_APP_API_PROTOCOL: http
+          PORT: 3001
+        with:
+          start: npm start
+          browser: firefox
+          wait-on: 'http://localhost:3001'
+          wait-on-timeout: 120
+          record: false
+          parallel: false
+          working-directory: client
+          command: npm run cypress:run
