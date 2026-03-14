@@ -2,15 +2,28 @@
 
 > **Archived — December 2021.** This project is no longer actively developed or maintained.
 
-CalTsar is a meeting accountability tool for Google Calendar. It syncs with your Google Calendar, identifies recurring events you organize, and lets you opt in to tracking them. The idea was that tracked events would trigger feedback surveys sent to attendees at the end of each meeting, giving organizers longitudinal insight into how their recurring meetings are going.
+CalTsar is a meeting accountability tool for Google Calendar. It was built to address a common problem in organizations: recurring meetings tend to accumulate over time, and there's rarely a structured way to evaluate whether they're still useful. Standup that nobody pays attention to, the weekly sync that could be an email, the retro that lost its spark three months ago — these meetings persist because nobody has the data to make a case for changing or cancelling them.
 
-## How it works
+CalTsar gives meeting organizers visibility into their recurring meetings by syncing with Google Calendar and letting them opt in to tracking specific events. The vision was that tracked meetings would automatically survey attendees after each occurrence, building up longitudinal feedback data that organizers could use to identify which meetings are working and which need to be rethought.
 
-1. Sign in with Google OAuth and grant read access to your calendar events
-2. CalTsar syncs your recurring events where you are the organizer
-3. Browse your events on a calendar view and toggle tracking on/off for individual recurring events
-4. Tracked events send feedback surveys to attendees after each instance
-5. Review aggregate and per-instance feedback over time
+## What you can do with CalTsar
+
+**See all your recurring meetings in one place.** After signing in with Google, CalTsar syncs your primary calendar and pulls out every recurring event where you are the organizer. These are displayed on an interactive calendar view spanning the current and next month, as well as a sortable table view with event details (summary, start/end times, timezone).
+
+**Stay in sync automatically.** CalTsar registers a webhook with Google Calendar so that any changes you make to your calendar (new recurring events, cancellations, time changes) are automatically reflected without needing to manually re-sync. If the webhook expires, the next time you open the app it re-syncs from scratch.
+
+**Choose which meetings to track.** Not every recurring meeting needs scrutiny. From the calendar view, you can click on any recurring event to toggle tracking on or off. Tracking is per-recurring-event — toggling it once applies to all future instances of that event. The events table also shows tracking status at a glance.
+
+**Account management.** You can delete your account and all associated data (events, tracking preferences, notification channels) at any time.
+
+### Intended but unfinished functionality
+
+CalTsar was archived at the MVP stage. The following features were planned but not fully implemented:
+
+- **Attendee feedback surveys** — The core value proposition. Tracked events were meant to trigger short feedback surveys sent to attendees at the conclusion of each meeting instance. The tracking infrastructure is in place, but the survey delivery and collection mechanism was not built.
+- **Feedback dashboards** — Aggregate and per-instance feedback views so organizers could see trends over time (e.g., a meeting's perceived usefulness declining over weeks).
+- **Non-primary calendar support** — Only the user's primary Google Calendar is synced.
+- **Non-organizer tracking** — Only events where the authenticated user is the organizer can be tracked.
 
 ## Architecture
 
