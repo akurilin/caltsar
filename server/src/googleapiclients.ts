@@ -31,8 +31,8 @@ export function generateNewAPIClient(
   // a sample payload looks something like this
   //
   // {
-  //   access_token: 'REDACTED_ACCESS_TOKEN_3',
-  //   refresh_token: 'REDACTED_REFRESH_TOKEN_3',
+  //   access_token: 'ya29.EXAMPLE_ACCESS_TOKEN',
+  //   refresh_token: '1//EXAMPLE_REFRESH_TOKEN',
   //   scope: 'https://www.googleapis.com/auth/calendar.events.readonly',
   //   token_type: 'Bearer',
   //   expiry_date: 1633411937822
